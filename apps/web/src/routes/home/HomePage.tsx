@@ -3,7 +3,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { useToast } from "../../lib/ToastContext";
-import { useSidebarRefresh } from "../../lib/SidebarRefreshContext";
 import type { Space } from "../../lib/types";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
@@ -27,7 +26,6 @@ function SpaceCardSkeleton() {
 
 export function HomePage() {
   const { toast } = useToast();
-  const { refreshSidebar } = useSidebarRefresh();
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [name, setName] = useState("");
@@ -50,7 +48,6 @@ export function HomePage() {
       setDescription("");
       setSheetOpen(false);
       toast({ variant: "success", title: "Space created", description: `"${res.space.name}" is ready.` });
-      refreshSidebar();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create space";
       setError(message);

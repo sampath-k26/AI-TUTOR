@@ -3,7 +3,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { useToast } from "../../lib/ToastContext";
-import { useSidebarRefresh } from "../../lib/SidebarRefreshContext";
 import type { Project, Space } from "../../lib/types";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
@@ -27,7 +26,6 @@ function ProjectCardSkeleton() {
 export function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
   const { toast } = useToast();
-  const { refreshSidebar } = useSidebarRefresh();
   const [data, setData] = useState<{ space: Space; projects: Project[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -62,7 +60,6 @@ export function SpaceDetailPage() {
       setLearningGoal("");
       setSheetOpen(false);
       toast({ variant: "success", title: "Project created", description: `"${res.project.name}" is ready.` });
-      refreshSidebar();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create project";
       setError(message);

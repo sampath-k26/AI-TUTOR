@@ -34,9 +34,12 @@ export function HomeOverview() {
 
   if (!overview) return null;
 
-  const { continueLearningProject, recentProjects, overallProgress, areasRequiringAttention, recommendedNextAction } = overview;
+  const { continueLearningProject, overallProgress, areasRequiringAttention, recommendedNextAction } = overview;
 
-  if (!continueLearningProject && recentProjects.length === 0) return null;
+  // continueLearningProject is only unset when the user owns no Projects at all
+  // (see analytics/service.ts's getHomeOverview) — nothing else here is worth
+  // showing on its own in that case.
+  if (!continueLearningProject) return null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -96,23 +99,6 @@ export function HomeOverview() {
                     </div>
                     <Badge variant="warning">{concept.level.toFixed(0)}% mastery</Badge>
                   </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {recentProjects.length > 0 && (
-        <div>
-          <h2 className="mb-2 text-[13.5px] font-semibold text-foreground">Recent Projects</h2>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {recentProjects.map((project) => (
-              <Link key={project.id} to={`/projects/${project.id}`}>
-                <Card interactive>
-                  <CardHeader>
-                    <CardTitle>{project.name}</CardTitle>
-                  </CardHeader>
                 </Card>
               </Link>
             ))}

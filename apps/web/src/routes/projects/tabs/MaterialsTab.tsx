@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
 import { useToast } from "../../../lib/ToastContext";
-import { useSidebarRefresh } from "../../../lib/SidebarRefreshContext";
 import type { Material } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent } from "../../../components/ui/card";
@@ -25,7 +24,6 @@ function MaterialCardSkeleton() {
 export function MaterialsTab() {
   const project = useProjectContext();
   const { toast } = useToast();
-  const { refreshSidebar } = useSidebarRefresh();
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +58,6 @@ export function MaterialsTab() {
       setMaterials((prev) => [res.material, ...(prev ?? [])]);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast({ variant: "success", title: "Material uploaded", description: `"${res.material.originalFilename}" is processing.` });
-      refreshSidebar();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);
