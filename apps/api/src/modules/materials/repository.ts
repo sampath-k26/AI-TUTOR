@@ -1,7 +1,15 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "../../core/db";
 import { concepts, materialChunks, materials, projects } from "../../../db/schema";
 import type { Chunk } from "./processing/chunking";
+
+export interface RetrievedChunk {
+  id: string;
+  materialId: string;
+  pageNumber: number;
+  content: string;
+  similarity: number;
+}
 
 /** Scoped by ownerId via a join to projects (defense layer 1 of decision D16). */
 export async function getMaterialForOwner(materialId: string, ownerId: string) {
@@ -62,6 +70,29 @@ export async function insertChunks(materialId: string, projectId: string, chunks
 export async function listConceptNamesForProject(projectId: string): Promise<string[]> {
   const rows = await db.select({ name: concepts.name }).from(concepts).where(eq(concepts.projectId, projectId));
   return rows.map((r) => r.name);
+}
+
+/** Vector similarity search — the sole owner of read access to material_chunks (see CLAUDE.md module-boundary rule). */
+export async function searchChunksByEmbedding(
+  projectId: string,
+  queryEmbedding: number[],
+  topK: number,
+  similarityThreshold: number,
+): Promise<RetrievedChunk[]> {
+  const similarity = sql<number>`1 - (${cosineDistance(materialChunks.embedding, queryEmbedding)})`;
+
+  return db
+    .select({
+      id: materialChunks.id,
+      materialId: materialChunks.materialId,
+      pageNumber: materialChunks.pageNumber,
+      content: materialChunks.content,
+      similarity,
+    })
+    .from(materialChunks)
+    .where(and(eq(materialChunks.projectId, projectId), gt(similarity, similarityThreshold)))
+    .orderBy((t) => desc(t.similarity))
+    .limit(topK);
 }
 
 export async function getFilenamesByIds(materialIds: string[]): Promise<Map<string, string>> {
