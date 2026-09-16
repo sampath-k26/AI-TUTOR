@@ -165,7 +165,7 @@ Uploaded documents and user chat messages are **data**, never trusted instructio
 
 ## 7. Security & data isolation
 
-- **AuthN**: Supabase Auth issues JWTs; an Express middleware verifies signature/expiry on every request (locally, using the Supabase project's JWT secret, to avoid a network round trip per request), extracting `user_id` and `role` onto `req.user`.
+- **AuthN**: Supabase Auth issues JWTs; an Express middleware verifies every request's token via `supabase.auth.getClaims()` — Supabase's own recommended verification path, which handles both legacy HS256 shared-secret projects and current asymmetric (ES256/JWKS) signing keys (the default for all projects created since May 2025) transparently, extracting `user_id` onto `req.user`. `role` is read separately from the `profiles` table (see `requireAdmin`), not from the JWT.
 - **AuthZ**: every service function that reads/writes a Project-scoped entity takes the authenticated `user_id` and filters/validates ownership explicitly (defense layer 1).
 - **RLS**: every user-owned table also has a Postgres Row-Level Security policy scoped to `owner_id = auth.uid()` (defense layer 2) — catches any query path that bypasses the service layer.
 - **Admin role**: a `role` column on the user profile (`user` | `admin`); admin-only routers/pages check this explicitly server-side (never trust a frontend-only check).

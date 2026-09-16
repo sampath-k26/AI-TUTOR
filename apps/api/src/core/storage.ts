@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config } from "./config";
+import { supabaseClientOptions } from "./supabaseClientOptions";
 
 /**
  * Lazily constructed: @supabase/supabase-js throws synchronously if the URL/key
@@ -10,7 +11,7 @@ import { config } from "./config";
 let client: SupabaseClient | null = null;
 
 function getClient(): SupabaseClient {
-  client ??= createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY);
+  client ??= createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, supabaseClientOptions);
   return client;
 }
 

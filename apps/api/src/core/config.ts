@@ -17,8 +17,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).default("postgresql://ai_tutor:ai_tutor_dev_password@localhost:5432/ai_tutor_dev"),
 
   SUPABASE_URL: z.string().optional().default(""),
+  SUPABASE_ANON_KEY: z.string().optional().default(""),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
-  SUPABASE_JWT_SECRET: z.string().optional().default(""),
   SUPABASE_STORAGE_BUCKET: z.string().default("materials"),
 
   GEMINI_API_KEY: z.string().optional().default(""),
