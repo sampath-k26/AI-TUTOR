@@ -13,7 +13,7 @@
  * Usage: npm run seed --workspace apps/api (requires GEMINI_API_KEY/GROQ_API_KEY
  * and a working Supabase connection in apps/api/.env).
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { config, isAiConfigured } from "../src/core/config";
 import { supabaseClientOptions } from "../src/core/supabaseClientOptions";
@@ -26,6 +26,7 @@ import * as aiService from "../src/modules/ai/service";
 import { boss } from "../src/workers/bossClient";
 import { registerProcessMaterialWorker } from "../src/workers/processMaterial";
 import { registerGenerateRecommendationWorker } from "../src/workers/generateRecommendation";
+import { buildDemoPdf, buildFakeUploadFile, getOrCreateUser, sleep, waitForMaterialReady } from "./_shared/fixtures";
 
 const DEMO_PASSWORD = "DemoLearner123!";
 
@@ -95,114 +96,13 @@ const DEMO_USERS: DemoUserSpec[] = [
 ];
 
 const QUIZ_QUESTION_COUNT = 3;
-const MATERIAL_READY_TIMEOUT_MS = 60_000;
 const RECOMMENDATION_TIMEOUT_MS = 45_000;
 const POLL_INTERVAL_MS = 2_000;
 const INTER_LEARNER_PAUSE_MS = 15_000;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function escapePdfText(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-}
-
-function wrapText(text: string, maxChars: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length > maxChars) {
-      if (current) lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-/** Minimal hand-built single-page PDF (no external PDF library needed) — real embedded text, real xref table. */
-function buildDemoPdf(title: string, paragraphs: string[]): Buffer {
-  const lines: string[] = [title, "", ...paragraphs.flatMap((p) => [...wrapText(p, 58), ""])];
-  const textOps = lines
-    .map((line, i) => (i === 0 ? `(${escapePdfText(line)}) Tj` : `0 -14 Td (${escapePdfText(line)}) Tj`))
-    .join(" ");
-  const stream = `BT /F1 11 Tf 20 480 Td ${textOps} ET`;
-
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 320 500] /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`,
-  ];
-
-  let pdf = "%PDF-1.4\n";
-  const offsets: number[] = [];
-  for (const [i, obj] of objects.entries()) {
-    offsets.push(Buffer.byteLength(pdf, "latin1"));
-    pdf += `${i + 1} 0 obj\n${obj}\nendobj\n`;
-  }
-
-  const xrefOffset = Buffer.byteLength(pdf, "latin1");
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (const offset of offsets) {
-    pdf += `${offset.toString().padStart(10, "0")} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-  return Buffer.from(pdf, "latin1");
-}
-
-function buildFakeUploadFile(filename: string, buffer: Buffer): Express.Multer.File {
-  return {
-    fieldname: "file",
-    originalname: filename,
-    mimetype: "application/pdf",
-    buffer,
-    size: buffer.length,
-  } as unknown as Express.Multer.File;
-}
-
 async function findExistingProfileByEmail(email: string) {
   const [row] = await db.select().from(profiles).where(eq(profiles.email, email)).limit(1);
   return row;
-}
-
-async function getOrCreateDemoUser(supabaseAdmin: SupabaseClient, email: string): Promise<string> {
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: DEMO_PASSWORD,
-    email_confirm: true,
-  });
-
-  if (!error && data.user) return data.user.id;
-
-  // Already registered from a previous run — look it up instead of failing.
-  if (error?.message.toLowerCase().includes("already been registered") || error?.message.toLowerCase().includes("already registered")) {
-    const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) throw listError;
-    const existing = listData.users.find((u) => u.email === email);
-    if (!existing) throw new Error(`Could not find existing auth user for ${email}`);
-    return existing.id;
-  }
-
-  throw error ?? new Error(`Failed to create demo user ${email}`);
-}
-
-async function waitForMaterialReady(materialId: string, ownerId: string): Promise<void> {
-  const deadline = Date.now() + MATERIAL_READY_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const material = await materialsService.getMaterial(materialId, ownerId);
-    if (material?.status === "ready") return;
-    if (material?.status === "failed") throw new Error(`Material processing failed: ${material.errorDetail}`);
-    await sleep(POLL_INTERVAL_MS);
-  }
-  throw new Error(`Material ${materialId} did not become ready within ${MATERIAL_READY_TIMEOUT_MS}ms`);
 }
 
 async function waitForRecommendation(projectId: string, ownerId: string): Promise<boolean> {
@@ -286,7 +186,7 @@ async function main() {
       continue;
     }
 
-    const userId = await getOrCreateDemoUser(supabaseAdmin, spec.email);
+    const userId = await getOrCreateUser(supabaseAdmin, spec.email, DEMO_PASSWORD);
     await learningService.ensureProfile(userId, spec.email);
     if (spec.role === "admin") {
       await db.update(profiles).set({ role: "admin" }).where(eq(profiles.id, userId));
