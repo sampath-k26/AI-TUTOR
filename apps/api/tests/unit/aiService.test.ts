@@ -25,7 +25,7 @@ const materialsServiceMocks = vi.hoisted(() => ({
 
 vi.mock("../../src/modules/ai/repository", () => repoMocks);
 vi.mock("../../src/modules/ai/retrieval", () => retrievalMocks);
-vi.mock("../../src/aiProvider", () => ({ geminiProvider: aiProviderMocks }));
+vi.mock("../../src/aiProvider", () => ({ geminiProvider: aiProviderMocks, GEMINI_TEXT_MODEL: "gemini-3.6-flash" }));
 vi.mock("../../src/modules/learning/service", () => learningServiceMocks);
 vi.mock("../../src/modules/materials/service", () => materialsServiceMocks);
 

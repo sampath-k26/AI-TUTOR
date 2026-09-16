@@ -4,6 +4,7 @@ import { config } from "../core/config";
 import { logAiUsage } from "../core/observability";
 import {
   AiGenerationError,
+  withRetry,
   type DocumentUnderstandingProvider,
   type EmbeddingProvider,
   type EmbedParams,
@@ -15,7 +16,10 @@ import {
 } from "./base";
 import { EMBEDDING_DIMENSIONS } from "../../db/schema";
 
-const TEXT_MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash was retired for new API keys — discovered via our own
+// ai_usage_log error_detail (the API's 404 pointed straight at the replacement),
+// exactly the kind of "why did this fail" investigation decision D14 exists for.
+export const TEXT_MODEL = "gemini-3.6-flash";
 const EMBEDDING_MODEL = "gemini-embedding-001";
 
 /**
@@ -25,7 +29,7 @@ const EMBEDDING_MODEL = "gemini-embedding-001";
  * per the PRD's "how much did a request cost" observability requirement.
  */
 const PRICE_PER_MILLION_TOKENS_USD: Record<string, { input: number; output: number }> = {
-  "gemini-2.5-flash": { input: 0.3, output: 2.5 },
+  "gemini-3.6-flash": { input: 0.3, output: 2.5 },
   "gemini-embedding-001": { input: 0.15, output: 0 },
 };
 
@@ -45,11 +49,13 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
   async generateText(params: GenerateTextParams): Promise<GenerateTextResult> {
     const start = Date.now();
     try {
-      const response = await this.client.models.generateContent({
-        model: TEXT_MODEL,
-        contents: params.prompt,
-        config: params.systemInstruction ? { systemInstruction: params.systemInstruction } : undefined,
-      });
+      const response = await withRetry(() =>
+        this.client.models.generateContent({
+          model: TEXT_MODEL,
+          contents: params.prompt,
+          config: params.systemInstruction ? { systemInstruction: params.systemInstruction } : undefined,
+        }),
+      );
 
       const text = response.text ?? "";
       const tokensIn = response.usageMetadata?.promptTokenCount ?? 0;
@@ -85,15 +91,17 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
     const start = Date.now();
     try {
-      const response = await this.client.models.generateContent({
-        model: TEXT_MODEL,
-        contents: params.prompt,
-        config: {
-          systemInstruction: params.systemInstruction,
-          responseMimeType: "application/json",
-          responseJsonSchema: z.toJSONSchema(params.schema as unknown as ZodType),
-        },
-      });
+      const response = await withRetry(() =>
+        this.client.models.generateContent({
+          model: TEXT_MODEL,
+          contents: params.prompt,
+          config: {
+            systemInstruction: params.systemInstruction,
+            responseMimeType: "application/json",
+            responseJsonSchema: z.toJSONSchema(params.schema as unknown as ZodType),
+          },
+        }),
+      );
 
       const tokensIn = response.usageMetadata?.promptTokenCount ?? 0;
       const tokensOut = response.usageMetadata?.candidatesTokenCount ?? 0;
@@ -132,11 +140,13 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
   async embed(params: EmbedParams): Promise<number[]> {
     const start = Date.now();
     try {
-      const response = await this.client.models.embedContent({
-        model: EMBEDDING_MODEL,
-        contents: params.text,
-        config: { outputDimensionality: EMBEDDING_DIMENSIONS },
-      });
+      const response = await withRetry(() =>
+        this.client.models.embedContent({
+          model: EMBEDDING_MODEL,
+          contents: params.text,
+          config: { outputDimensionality: EMBEDDING_DIMENSIONS },
+        }),
+      );
 
       const values = response.embeddings?.[0]?.values ?? [];
 
@@ -168,15 +178,17 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
   async understandDocument(params: UnderstandDocumentParams): Promise<string> {
     const start = Date.now();
     try {
-      const response = await this.client.models.generateContent({
-        model: TEXT_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: params.prompt }, { inlineData: { data: params.imageBase64, mimeType: params.mimeType } }],
-          },
-        ],
-      });
+      const response = await withRetry(() =>
+        this.client.models.generateContent({
+          model: TEXT_MODEL,
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: params.prompt }, { inlineData: { data: params.imageBase64, mimeType: params.mimeType } }],
+            },
+          ],
+        }),
+      );
 
       const text = response.text ?? "";
       const tokensIn = response.usageMetadata?.promptTokenCount ?? 0;

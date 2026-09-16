@@ -1,7 +1,8 @@
-import { GeminiProvider } from "./geminiProvider";
+import { GeminiProvider, TEXT_MODEL as GEMINI_TEXT_MODEL } from "./geminiProvider";
 import { GroqProvider } from "./groqProvider";
 
 export * from "./base";
+export { GEMINI_TEXT_MODEL };
 
 /**
  * Singletons — modules import these, never instantiate a provider or call an

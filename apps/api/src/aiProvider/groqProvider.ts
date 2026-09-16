@@ -4,6 +4,7 @@ import { config } from "../core/config";
 import { logAiUsage } from "../core/observability";
 import {
   AiGenerationError,
+  withRetry,
   type GenerateStructuredParams,
   type GenerateTextParams,
   type GenerateTextResult,
@@ -14,8 +15,11 @@ import {
  * Open-weight model served on Groq's free tier — used only for adaptive-quiz question
  * generation, where latency matters more than the extra reasoning depth Gemini provides
  * (decision D7). Never used for Tutor grounding/citation, embeddings, or document understanding.
+ * llama-3.3-70b-versatile was retired from Groq's catalog (404 model_not_found) — verified
+ * against GET /openai/v1/models that gpt-oss-120b is both available and advertises
+ * "structured_outputs" support, which our generateStructured() relies on.
  */
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "openai/gpt-oss-120b";
 
 export class GroqProvider implements TextProvider {
   private client: Groq;
@@ -27,13 +31,15 @@ export class GroqProvider implements TextProvider {
   async generateText(params: GenerateTextParams): Promise<GenerateTextResult> {
     const start = Date.now();
     try {
-      const completion = await this.client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          ...(params.systemInstruction ? [{ role: "system" as const, content: params.systemInstruction }] : []),
-          { role: "user" as const, content: params.prompt },
-        ],
-      });
+      const completion = await withRetry(() =>
+        this.client.chat.completions.create({
+          model: MODEL,
+          messages: [
+            ...(params.systemInstruction ? [{ role: "system" as const, content: params.systemInstruction }] : []),
+            { role: "user" as const, content: params.prompt },
+          ],
+        }),
+      );
 
       const text = completion.choices[0]?.message?.content ?? "";
 
@@ -67,21 +73,23 @@ export class GroqProvider implements TextProvider {
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
     const start = Date.now();
     try {
-      const completion = await this.client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          ...(params.systemInstruction ? [{ role: "system" as const, content: params.systemInstruction }] : []),
-          { role: "user" as const, content: params.prompt },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: params.schemaName,
-            schema: z.toJSONSchema(params.schema) as Record<string, unknown>,
-            strict: true,
+      const completion = await withRetry(() =>
+        this.client.chat.completions.create({
+          model: MODEL,
+          messages: [
+            ...(params.systemInstruction ? [{ role: "system" as const, content: params.systemInstruction }] : []),
+            { role: "user" as const, content: params.prompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: params.schemaName,
+              schema: z.toJSONSchema(params.schema) as Record<string, unknown>,
+              strict: true,
+            },
           },
-        },
-      });
+        }),
+      );
 
       await logAiUsage({
         feature: params.feature,

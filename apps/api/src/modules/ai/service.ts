@@ -1,4 +1,4 @@
-import { geminiProvider } from "../../aiProvider";
+import { GEMINI_TEXT_MODEL, geminiProvider } from "../../aiProvider";
 import { getProjectForOwner } from "../learning/service";
 import { getFilenamesByIds } from "../materials/service";
 import * as repo from "./repository";
@@ -99,7 +99,7 @@ export async function handleTutorMessage(
     role: "assistant",
     content: structured.answer,
     citations: citationsWithNames,
-    model: "gemini-2.5-flash",
+    model: GEMINI_TEXT_MODEL,
     latencyMs,
   });
 

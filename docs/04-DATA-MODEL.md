@@ -161,7 +161,7 @@ Index: `ivfflat` (or `hnsw`) on `embedding`, plus a btree on `project_id` so sim
 |---|---|---|
 | id | uuid PK | |
 | feature | text | `tutor`\|`quiz_generation`\|`grading`\|`recommendation`\|`document_understanding`\|`embedding`\|`eval` |
-| provider, model | text | e.g. `gemini`, `gemini-2.5-flash` |
+| provider, model | text | e.g. `gemini`, `gemini-3.6-flash` |
 | latency_ms | int | |
 | tokens_in, tokens_out | int | |
 | estimated_cost_usd | numeric(10,6) | |
