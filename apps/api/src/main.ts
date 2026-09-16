@@ -7,6 +7,7 @@ import { materialsRouter } from "./modules/materials/router";
 import { aiRouter } from "./modules/ai/router";
 import { assessmentRouter } from "./modules/assessment/router";
 import { analyticsRouter } from "./modules/analytics/router";
+import { adminRouter } from "./modules/admin/router";
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use("/api", materialsRouter);
 app.use("/api", aiRouter);
 app.use("/api", assessmentRouter);
 app.use("/api", analyticsRouter);
+app.use("/api", adminRouter);
 
 // Central error handler — catches everything forwarded via next(err), including
 // rejected promises from async route handlers (Express 5 does this automatically).
