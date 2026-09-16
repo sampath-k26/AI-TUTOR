@@ -19,7 +19,8 @@
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
     "eval": "tsx scripts/runEval.ts",
-    "worker": "tsx watch src/workers/runWorker.ts"
+    "worker": "tsx watch src/workers/runWorker.ts",
+    "worker:start": "tsx src/workers/runWorker.ts"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
@@ -36,6 +37,7 @@
     "pdfjs-dist": "5.5.207",
     "pg": "^8.23.0",
     "pg-boss": "^10.4.2",
+    "tsx": "^4.23.13",
     "ws": "^8.21.3",
     "zod": "^4.6.5"
   },
@@ -51,7 +53,6 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.10.0",
     "supertest": "^7.2.2",
-    "tsx": "^4.23.13",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.70.0",
     "vitest": "^4.1.11"
