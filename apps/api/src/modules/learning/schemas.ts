@@ -21,3 +21,11 @@ export const spaceIdParamSchema = z.object({
 export const projectIdParamSchema = z.object({
   projectId: z.uuid(),
 });
+
+export const listProjectsQuerySchema = z.object({
+  q: z.string().trim().min(1).max(200).optional(),
+  spaceId: z.uuid().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;

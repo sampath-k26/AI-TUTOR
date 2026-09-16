@@ -1,7 +1,7 @@
 import { db } from "../../core/db";
 import { events } from "../../../db/schema";
 import * as repo from "./repository";
-import type { CreateProjectInput, CreateSpaceInput } from "./schemas";
+import type { CreateProjectInput, CreateSpaceInput, ListProjectsQuery } from "./schemas";
 
 export async function ensureProfile(userId: string, email: string) {
   return repo.getOrCreateProfile(userId, email);
@@ -12,7 +12,17 @@ export async function listSpaces(ownerId: string) {
 }
 
 export async function createSpace(ownerId: string, input: CreateSpaceInput) {
-  return repo.createSpace(ownerId, input);
+  const space = await repo.createSpace(ownerId, input);
+
+  if (space) {
+    await db.insert(events).values({
+      userId: ownerId,
+      type: "space_created",
+      payload: { spaceId: space.id, name: space.name },
+    });
+  }
+
+  return space;
 }
 
 /** Returns undefined if the space doesn't exist or isn't owned by this user — router maps that to 404. */
@@ -44,6 +54,21 @@ export async function createProject(spaceId: string, ownerId: string, input: Cre
 
 export async function listAllProjects(ownerId: string) {
   return repo.listProjectsByOwner(ownerId);
+}
+
+const DEFAULT_PROJECTS_PAGE_SIZE = 10;
+
+/** Sidebar's Projects list: search by name, filter by Space, paginated. */
+export async function searchProjects(ownerId: string, query: ListProjectsQuery) {
+  const limit = query.limit ?? DEFAULT_PROJECTS_PAGE_SIZE;
+  const offset = query.offset ?? 0;
+
+  const [projectRows, total] = await Promise.all([
+    repo.listProjectsByOwner(ownerId, { ...query, limit, offset }),
+    repo.countProjectsByOwner(ownerId, query),
+  ]);
+
+  return { projects: projectRows, total, limit, offset };
 }
 
 /** Returns undefined if the project doesn't exist or isn't owned by this user — router maps that to 404. */

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../../core/auth";
 import * as service from "./service";
-import { createProjectSchema, createSpaceSchema, projectIdParamSchema, spaceIdParamSchema } from "./schemas";
+import { createProjectSchema, createSpaceSchema, listProjectsQuerySchema, projectIdParamSchema, spaceIdParamSchema } from "./schemas";
 
 export const learningRouter = Router();
 
@@ -64,9 +64,21 @@ learningRouter.post("/spaces/:spaceId/projects", async (req, res) => {
   res.status(201).json({ project });
 });
 
+/**
+ * Sidebar's Projects list: search (name), Space filter, pagination
+ * (default page size 10). Other modules that need every owned project
+ * unpaginated (e.g. analytics' Home/Global overviews) call
+ * learningService.listAllProjects directly instead of this endpoint.
+ */
 learningRouter.get("/projects", async (req, res) => {
-  const projects = await service.listAllProjects(req.user!.id);
-  res.json({ projects });
+  const query = listProjectsQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.flatten() });
+    return;
+  }
+
+  const result = await service.searchProjects(req.user!.id, query.data);
+  res.json(result);
 });
 
 learningRouter.get("/projects/:projectId", async (req, res) => {

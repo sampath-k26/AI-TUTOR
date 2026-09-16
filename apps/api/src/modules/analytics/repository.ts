@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import { db } from "../../core/db";
 import {
   aiUsageLog,
@@ -218,4 +218,40 @@ export async function getGlobalQuizStats(projectIds: string[]) {
     .from(quizzes)
     .where(inArray(quizzes.projectId, projectIds));
   return { totalQuizzes: Number(row?.totalQuizzes ?? 0), completedQuizzes: Number(row?.completedQuizzes ?? 0) };
+}
+
+/**
+ * Sidebar's Activity log (User Home / global scope, not per-project): "spaces"
+ * covers Space-lifecycle events, "projects" covers everything else (material
+ * processing, Tutor messages, quizzes, mastery, recommendations — all of which
+ * carry a project_id). A fixed, small set of types rather than a schema column,
+ * since it's presentation-level grouping, not a distinct kind of event.
+ */
+const SPACE_EVENT_TYPES: string[] = ["space_created"];
+
+function userActivityFilter(ownerId: string, category: "projects" | "spaces") {
+  return and(eq(events.userId, ownerId), category === "spaces" ? inArray(events.type, SPACE_EVENT_TYPES) : notInArray(events.type, SPACE_EVENT_TYPES));
+}
+
+export async function getUserActivity(ownerId: string, category: "projects" | "spaces", limit: number, offset: number) {
+  return db
+    .select({
+      id: events.id,
+      type: events.type,
+      projectId: events.projectId,
+      projectName: projects.name,
+      payload: events.payload,
+      createdAt: events.createdAt,
+    })
+    .from(events)
+    .leftJoin(projects, eq(events.projectId, projects.id))
+    .where(userActivityFilter(ownerId, category))
+    .orderBy(desc(events.createdAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function countUserActivity(ownerId: string, category: "projects" | "spaces"): Promise<number> {
+  const [row] = await db.select({ count: count() }).from(events).where(userActivityFilter(ownerId, category));
+  return Number(row?.count ?? 0);
 }

@@ -54,3 +54,17 @@ export async function getGlobalAnalytics(ownerId: string) {
     quizStats,
   };
 }
+
+const DEFAULT_ACTIVITY_PAGE_SIZE = 10;
+
+export async function getUserActivity(ownerId: string, category: "projects" | "spaces", limit?: number, offset?: number) {
+  const pageSize = limit ?? DEFAULT_ACTIVITY_PAGE_SIZE;
+  const pageOffset = offset ?? 0;
+
+  const [activity, total] = await Promise.all([
+    repo.getUserActivity(ownerId, category, pageSize, pageOffset),
+    repo.countUserActivity(ownerId, category),
+  ]);
+
+  return { activity, total, limit: pageSize, offset: pageOffset };
+}

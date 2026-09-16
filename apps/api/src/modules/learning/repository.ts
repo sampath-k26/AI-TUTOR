@@ -1,7 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ilike } from "drizzle-orm";
 import { db } from "../../core/db";
 import { profiles, projects, spaces } from "../../../db/schema";
-import type { CreateProjectInput, CreateSpaceInput } from "./schemas";
+import type { CreateProjectInput, CreateSpaceInput, ListProjectsQuery } from "./schemas";
 
 /**
  * Every query here is scoped by ownerId (defense layer 1 of decision D16) — a row
@@ -55,8 +55,28 @@ export async function listProjectsBySpaceForOwner(spaceId: string, ownerId: stri
     .orderBy(desc(projects.createdAt));
 }
 
-export async function listProjectsByOwner(ownerId: string) {
-  return db.select().from(projects).where(eq(projects.ownerId, ownerId)).orderBy(desc(projects.createdAt));
+function projectFilters(ownerId: string, query?: Pick<ListProjectsQuery, "q" | "spaceId">) {
+  const conditions = [
+    eq(projects.ownerId, ownerId),
+    query?.spaceId ? eq(projects.spaceId, query.spaceId) : undefined,
+    query?.q ? ilike(projects.name, `%${query.q}%`) : undefined,
+  ].filter((c) => c !== undefined);
+  return and(...conditions);
+}
+
+export async function listProjectsByOwner(ownerId: string, query?: ListProjectsQuery) {
+  return db
+    .select()
+    .from(projects)
+    .where(projectFilters(ownerId, query))
+    .orderBy(desc(projects.createdAt))
+    .limit(query?.limit ?? 1000)
+    .offset(query?.offset ?? 0);
+}
+
+export async function countProjectsByOwner(ownerId: string, query?: Pick<ListProjectsQuery, "q" | "spaceId">): Promise<number> {
+  const [row] = await db.select({ count: count() }).from(projects).where(projectFilters(ownerId, query));
+  return Number(row?.count ?? 0);
 }
 
 export async function getProjectByIdForOwner(projectId: string, ownerId: string) {
