@@ -89,3 +89,57 @@ export interface AnswerResult {
   masteryLevel: number;
   trend: "improving" | "stable" | "requires_attention";
 }
+
+export interface GrowthItem {
+  conceptId: string;
+  conceptName: string;
+  level: number;
+  trend: "improving" | "stable" | "requires_attention";
+  updatedAt: string;
+}
+
+export interface Recommendation {
+  id: string;
+  projectId: string;
+  text: string;
+  rationale: Record<string, unknown> | null;
+  status: "active" | "dismissed" | "completed";
+  createdAt: string;
+}
+
+export interface EventCount {
+  type: string;
+  count: number;
+}
+
+export interface ProjectAnalytics {
+  eventCounts: EventCount[];
+  assessmentStats: {
+    totalQuizzes: number;
+    completedQuizzes: number;
+    totalQuestionsAnswered: number;
+    correctCount: number;
+    averageScore: number | null;
+  };
+  masterySummary: {
+    conceptCount: number;
+    averageMastery: number | null;
+    trendCounts: { improving: number; stable: number; requires_attention: number };
+  };
+  aiUsage: {
+    callCount: number;
+    successCount: number;
+    totalTokensIn: number;
+    totalTokensOut: number;
+    totalCostUsd: number;
+    averageLatencyMs: number | null;
+  };
+}
+
+export interface GlobalAnalytics {
+  projectCount: number;
+  materialCount: number;
+  eventCounts: EventCount[];
+  masterySummary: { conceptCount: number; averageMastery: number | null };
+  quizStats: { totalQuizzes: number; completedQuizzes: number };
+}

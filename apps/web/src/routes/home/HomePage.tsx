@@ -47,9 +47,16 @@ export function HomePage() {
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-foreground">Your Spaces</h1>
-        <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
-          Log out
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link to="/analytics">
+            <Button variant="outline" size="sm">
+              Global Analytics
+            </Button>
+          </Link>
+          <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
+            Log out
+          </Button>
+        </div>
       </header>
 
       <Card>

@@ -8,6 +8,9 @@ import { ProjectLayout } from "./routes/projects/ProjectLayout";
 import { MaterialsTab } from "./routes/projects/tabs/MaterialsTab";
 import { TutorTab } from "./routes/projects/tabs/TutorTab";
 import { QuizTab } from "./routes/projects/tabs/QuizTab";
+import { GrowthTab } from "./routes/projects/tabs/GrowthTab";
+import { AnalyticsTab } from "./routes/projects/tabs/AnalyticsTab";
+import { GlobalAnalyticsPage } from "./routes/analytics/GlobalAnalyticsPage";
 
 export function App() {
   return (
@@ -32,6 +35,14 @@ export function App() {
           }
         />
         <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <GlobalAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/projects/:projectId"
           element={
             <ProtectedRoute>
@@ -43,6 +54,8 @@ export function App() {
           <Route path="materials" element={<MaterialsTab />} />
           <Route path="tutor" element={<TutorTab />} />
           <Route path="quiz" element={<QuizTab />} />
+          <Route path="growth" element={<GrowthTab />} />
+          <Route path="analytics" element={<AnalyticsTab />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

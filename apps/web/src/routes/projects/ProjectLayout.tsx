@@ -12,6 +12,8 @@ const TABS = [
   { to: "materials", label: "Materials" },
   { to: "tutor", label: "Tutor" },
   { to: "quiz", label: "Quiz" },
+  { to: "growth", label: "Growth" },
+  { to: "analytics", label: "Analytics" },
 ];
 
 export function ProjectLayout() {
