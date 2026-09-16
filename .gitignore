@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env files (never commit real secrets)
+.env
+.env.local
+.env.*.local
+apps/web/.env
+apps/web/.env.local
+apps/api/.env
+apps/api/.env.local
+!.env.example
+!apps/web/.env.example
+!apps/api/.env.example
+
+# Build output
+dist/
+build/
+apps/web/dist/
+apps/api/dist/
+.vite/
+.turbo/
+
+# Logs
+npm-debug.log*
+*.log
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Local Postgres data (docker-compose volume mount, if used)
+.pgdata/
+
+# Uploaded files during local dev (never store real user files in git)
+apps/api/uploads/
