@@ -14,13 +14,14 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, isFormData = false): Promise<T> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   const headers = new Headers(init?.headers);
-  headers.set("Content-Type", "application/json");
+  // Let the browser set Content-Type (with the multipart boundary) for FormData bodies.
+  if (!isFormData) headers.set("Content-Type", "application/json");
   if (session?.access_token) {
     headers.set("Authorization", `Bearer ${session.access_token}`);
   }
@@ -38,4 +39,5 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, data?: unknown) => request<T>(path, { method: "POST", body: data ? JSON.stringify(data) : undefined }),
+  postForm: <T>(path: string, formData: FormData) => request<T>(path, { method: "POST", body: formData }, true),
 };
