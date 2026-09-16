@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { config } from "./core/config";
 import { learningRouter } from "./modules/learning/router";
 import { materialsRouter } from "./modules/materials/router";
+import { aiRouter } from "./modules/ai/router";
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api", learningRouter);
 app.use("/api", materialsRouter);
+app.use("/api", aiRouter);
 
 // Central error handler — catches everything forwarded via next(err), including
 // rejected promises from async route handlers (Express 5 does this automatically).

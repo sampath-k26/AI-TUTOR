@@ -5,6 +5,6 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["src", "scripts", "db"],
+  "include": ["src", "scripts", "db", "tests"],
   "exclude": ["node_modules", "dist"]
 }
