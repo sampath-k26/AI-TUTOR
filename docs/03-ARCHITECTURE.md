@@ -1,10 +1,57 @@
 # System Architecture
 
-Reflects decisions in `02-DECISIONS-LOG.md` (including the Round 3 stack confirmation: Node/Express backend, React/Vite frontend). This is the architecture to be reviewed before implementation begins.
+Reflects decisions in `02-DECISIONS-LOG.md` (including the Round 3 stack confirmation: Node/Express backend, React/Vite frontend). Written before implementation began and kept as the as-built reference — updated where the real build diverged from the original plan (worker names, eval file format); everything else below matches what was actually shipped.
 
 ---
 
-## 1. High-level component diagram
+## 0. Component diagram (renders on GitHub)
+
+```mermaid
+flowchart TB
+    subgraph Client["React (Vite) Frontend — Vercel"]
+        UI["User Home · Spaces/Projects · Materials\nTutor Chat · Quiz · Growth/Analytics · Admin"]
+    end
+
+    subgraph API["Express (Node/TS) Backend — Render/Railway"]
+        Auth["core/auth — JWT verify via getClaims()"]
+        Modules["learning · materials · ai · assessment\nanalytics · admin"]
+        Providers["aiProvider — GeminiProvider · GroqProvider"]
+        Workers["workers — pg-boss jobs:\nprocessMaterial · generateRecommendation"]
+    end
+
+    subgraph Supabase["Supabase"]
+        PG[("Postgres + pgvector\n(RLS on every user-owned table)")]
+        SAuth["Auth (JWT issuance)"]
+        Storage["Storage (PDF files)"]
+    end
+
+    subgraph External["External AI Services"]
+        Gemini["Gemini API\ngeneration · embeddings · vision"]
+        Groq["Groq API\nfast MCQ generation"]
+    end
+
+    subgraph Obs["Observability"]
+        UsageLog[("ai_usage_log / events\n(Postgres, source of truth)")]
+        Langfuse["Langfuse Cloud\n(supplementary trace mirror)"]
+    end
+
+    UI -- "HTTPS + Bearer JWT" --> Auth
+    Auth --> Modules
+    Modules --> Providers
+    Modules --> Workers
+    Providers --> Gemini
+    Providers --> Groq
+    Modules --> PG
+    Workers --> PG
+    Modules --> Storage
+    UI -. "Supabase Auth SDK" .-> SAuth
+    Providers --> UsageLog
+    UsageLog -. mirrored .-> Langfuse
+```
+
+---
+
+## 1. High-level component diagram (ASCII reference)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -33,8 +80,9 @@ Reflects decisions in `02-DECISIONS-LOG.md` (including the Round 3 stack confirm
 │  └──────────────────────────────────────────────────────────────┘    │
 │  ┌──────────────────────────────────────────────────────────────┐    │
 │  │ workers/ — pg-boss jobs (Postgres-native queue)                │   │
-│  │   processMaterial · evaluateQuizAnswer · updateMastery         │   │
-│  │   detectWeakness · generateRecommendation                      │   │
+│  │   processMaterial · generateRecommendation                     │   │
+│  │   (quiz grading/mastery update run synchronously in submitAnswer,│  │
+│  │    not as a background job — see §5)                            │  │
 │  └──────────────────────────────────────────────────────────────┘    │
 └─────────────┬───────────────────────────────┬────────────────────────┘
               │                                │
@@ -66,9 +114,10 @@ Each module under `apps/api/src/modules/<name>/` owns: `router.ts` (HTTP only �
 | `materials` | Upload, processing status, chunks/knowledge, storage refs | `learning` (project ownership), `aiProvider` (embeddings/vision) |
 | `ai` | Tutor conversations, RAG retrieval, prompt construction, citation validation, unsupported-question handling | `materials` (retrieval), `learning` (context), `aiProvider` |
 | `assessment` | Quiz generation/selection, question bank, grading, mastery, growth | `materials` (concepts/content), `aiProvider` |
-| `analytics` | Project + global analytics, event aggregation | reads from all modules' tables (read-only) |
-| `admin` | User/Space/Project inspection, platform-wide activity, AI usage/eval views, system health | reads from all modules' tables (read-only), enforces admin role |
-| `recommendations` (submodule of `assessment` or standalone) | Recommendation generation/state | `assessment`, `ai` |
+| `analytics` | Project + global analytics, User Home overview, event aggregation | reads from all modules' tables (read-only) |
+| `admin` | User/Space/Project inspection, filterable activity, engagement, platform-wide learning analytics, AI usage/eval views, background-job status, system health | reads from all modules' tables (read-only) + `pgboss.job` directly, enforces admin role via `requireAdmin` |
+
+Recommendations ended up living inside `assessment` (repository/schemas) with their generation logic in `workers/generateRecommendation.ts` rather than a standalone module — the orchestration needed both `assessment`'s repository and a call out to `ai`'s provider, and giving it its own module would have meant a third module importing across the same boundary for no isolation benefit.
 
 ---
 
@@ -122,35 +171,45 @@ This is the literal code-level implementation of PRD §7's flow and evidence-bra
 ## 5. Data flow: Adaptive Quiz
 
 ```
-Start Quiz → assessment.service.selectNextQuestion(projectId)
-  1. Load mastery evidence store for this project (per-concept EMA mastery + evidence log)
-  2. Rank concepts by: lowMasteryWeight × recencyWeight × goalRelevance
-     (a concept the user hasn't touched in a while and is weak on, that also matters
-      to their stated learning goal, is prioritized — not simply "last answer wrong")
-  3. Pick difficulty near the concept's current mastery band (not derived from the single
-     last answer), avoid repeating the last N served question IDs/templates
-  4. Generate question via Groq (MCQ) or Gemini (open-ended) using Project material as grounding
-  5. User answers → assessment.service.evaluateAnswer()
-       - MCQ: deterministic correctness check
-       - Open-ended: Gemini structured evaluation → { understanding, accuracy, keyConceptsCovered,
-         missingConcepts, feedbackText } — never just a number
-  6. updateMastery(conceptId, evidence) — see mastery formula below
-  7. Enqueue background job: on quiz completion → evaluate → update mastery → detect weak
-     concepts → generate/update recommendation (PRD §11 "Learning workflow")
-  8. selectNextQuestion() runs again for the next item in the quiz
+Start Quiz → assessment.service.generateNextQuestion(quizId, projectId)
+  1. Load per-project concept candidates (mastery level + last-evidence recency)
+     and this quiz's recently-asked concept ids
+  2. selectNextConcept(): weakness × staleness scoring with a repeat-penalty
+     (not exclusion) for concepts just asked — see selection.ts
+  3. selectDifficulty(masteryLevel) — difficulty tracks the concept's current
+     mastery band, not the single last answer
+  4. Generate question via Groq (MCQ) or Gemini (open-ended) using Project
+     material as grounding, alternating type so a quiz demonstrably exercises both
+  5. User answers → assessment.service.submitAnswer() — synchronous, not a
+     background job, since the learner needs the result immediately:
+       - MCQ: deterministic correctness check (no AI call)
+       - Open-ended: Gemini structured evaluation → { understanding, accuracy,
+         keyConceptsCovered, missingConcepts, feedbackText } — never just a number
+       - updateMastery(conceptId, evidence) — weighted-evidence EMA, see formula below
+       - Insert a growth_snapshots row (mastery value + computed trend) in the same call
+  6. Finish Quiz → assessment.service.finishQuiz() → enqueues the ONE background
+     job in this flow: generateRecommendation(projectId) — repeated-mistake
+     detection + weak-concept scan → Gemini-generated recommendation text
+     (PRD §11 "Learning workflow"), skipped entirely if nothing is currently weak
+  7. generateNextQuestion() runs again for the next item in the quiz
 ```
 
-### Mastery update formula (D12)
+### Mastery update formula (D12) — as implemented in `assessment/mastery.ts`
 
 ```
-score(evidence) = baseCorrectness             // 1.0 correct / 0.0 incorrect (open-ended: graded 0-1)
-                 × difficultyWeight(question)  // harder correct answers move mastery more
-masteryNew = α · score(evidence) + (1 − α) · masteryOld · decay(Δt)
+score            = baseCorrectness × difficultyWeight(difficulty)   // scaled to 0-100
+                     baseCorrectness: 1.0 correct / 0.0 incorrect (open-ended: graded 0-1)
+                     difficultyWeight: 0.7x (easiest) .. 1.0x (mid) .. 1.3x (hardest)
+
+alpha            = max(0.15, 1 / (1 + evidenceCount))                // shrinks as evidence accumulates
+decayedOld       = 50 + (masteryOld − 50) × exp(−ln2 × daysSinceLastEvidence / 30)   // 30-day half-life toward the midpoint
+
+masteryNew       = clamp(alpha × score + (1 − alpha) × decayedOld, 0, 100)
 ```
-- `α` (learning rate) tuned higher early (sparse evidence) and lower once a concept has many data points — approximates confidence widening/narrowing without a full Bayesian model.
-- `decay(Δt)` slowly pulls mastery toward a neutral midpoint if a concept hasn't been touched recently, so "Growth" can show concepts going stale, not just improving.
-- A wrong answer pulls mastery down but not to zero (recoverable, matches PRD's non-punitive framing).
-- Every mastery change is logged with its evidence reference (`mastery` row + `growth_snapshots` row), so Growth Analysis is a query over history, not a separately-maintained parallel state.
+- `alpha` (learning rate) starts high with little evidence (responsive to a cold start) and shrinks toward a floor of 0.15 as `evidenceCount` grows — approximates confidence widening/narrowing without a full Bayesian model.
+- `decayedOld` exponentially pulls mastery toward the neutral midpoint (50) the longer a concept goes untouched (30-day half-life), so Growth Analysis can surface "requires attention" for concepts that have gone stale, not only ones answered incorrectly.
+- A wrong answer (`score = 0`) pulls mastery toward 0 proportionally to `(1 − alpha)`, never a hard reset — matches the PRD's explicit non-punitive framing and its "not a wrong→easy/correct→hard ladder" anti-requirement (§9).
+- Every mastery change writes both the `mastery` row (current state) and a `growth_snapshots` row (level + computed trend: `improving`/`stable`/`requires_attention`, based on the delta from the prior level) in the same `submitAnswer()` call — Growth Analysis is a query over that history, not a separately-maintained parallel state.
 
 ---
 
@@ -178,7 +237,7 @@ Uploaded documents and user chat messages are **data**, never trusted instructio
 
 - Every AI call (Tutor, quiz gen, grading, recommendations, document understanding) goes through the `aiProvider` interface, which wraps each call with: start/end timestamp → latency, provider+model used, feature tag, token counts, estimated cost (computed from published per-token pricing), success/failure + error detail. This is written to `ai_usage_log` (fire-and-forget, never blocks the user-facing response) and mirrored to Langfuse.
 - The Admin Dashboard's "AI usage" and "AI evaluation" views query `ai_usage_log` and `eval_result` directly — they work even if Langfuse is down, satisfying "the dashboard is the source of truth."
-- Golden eval set (`apps/api/eval/cases/*.json`) covering: grounded Tutor answers, unsupported-question handling, MCQ + open-ended grading accuracy, recommendation relevance. Run via a script (`apps/api/scripts/runEval.ts`) that calls the same service functions as production, scores with an LLM-as-judge prompt + deterministic checks (e.g., "does this cited page number exist in this material"), and writes results to `eval_result`. Re-run manually after any prompt/model/retrieval change — this is the regression-awareness the PRD asks for.
+- Golden eval set (`apps/api/eval/cases/*.ts`) covering: grounded Tutor answers, unsupported-question handling, a prompt-injection resistance case, MCQ + open-ended grading accuracy, recommendation relevance. Run via `apps/api/scripts/runEval.ts`, which calls the same service functions as production and scores each case against a structural/behavioral signal the app already produces and validates (`insufficientEvidence`, citation count, `isCorrect`, `understanding`, recommendation text mentioning the weak concept) rather than a second LLM-judge call per case — deliberately quota-frugal, since the run already makes real Gemini/Groq calls. Writes every result to `eval_result`, which the Admin Dashboard's "AI & System" tab reads. See `docs/08-EVALUATION.md` for the full write-up and current run status.
 
 ---
 
