@@ -1,6 +1,18 @@
-import { count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "../../core/db";
-import { aiUsageLog, events, growthSnapshots, materials, mastery, projects, questions, quizzes, responses } from "../../../db/schema";
+import {
+  aiUsageLog,
+  concepts,
+  events,
+  growthSnapshots,
+  materials,
+  mastery,
+  projects,
+  recommendations,
+  questions,
+  quizzes,
+  responses,
+} from "../../../db/schema";
 
 /**
  * Direct multi-table reads are the documented exception for this module (see
@@ -132,6 +144,68 @@ export async function getGlobalMaterialCount(ownerId: string): Promise<number> {
     .innerJoin(projects, eq(materials.projectId, projects.id))
     .where(eq(projects.ownerId, ownerId));
   return Number(row?.count ?? 0);
+}
+
+export async function getRecentlyActiveProjectId(ownerId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ projectId: events.projectId })
+    .from(events)
+    .where(and(eq(events.userId, ownerId), isNotNull(events.projectId)))
+    .orderBy(desc(events.createdAt))
+    .limit(1);
+  return row?.projectId ?? null;
+}
+
+/** Latest growth snapshot per concept, reduced in JS (same approach as getProjectMasterySummary above). */
+export async function getConceptsRequiringAttention(ownerId: string, limitCount = 5) {
+  const rows = await db
+    .select({
+      conceptId: growthSnapshots.conceptId,
+      conceptName: concepts.name,
+      projectId: growthSnapshots.projectId,
+      projectName: projects.name,
+      trend: growthSnapshots.trend,
+      level: growthSnapshots.level,
+      createdAt: growthSnapshots.createdAt,
+    })
+    .from(growthSnapshots)
+    .innerJoin(concepts, eq(growthSnapshots.conceptId, concepts.id))
+    .innerJoin(projects, eq(growthSnapshots.projectId, projects.id))
+    .where(eq(projects.ownerId, ownerId))
+    .orderBy(desc(growthSnapshots.createdAt));
+
+  const latestByConceptId = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (!latestByConceptId.has(row.conceptId)) latestByConceptId.set(row.conceptId, row);
+  }
+
+  return [...latestByConceptId.values()]
+    .filter((r) => r.trend === "requires_attention")
+    .slice(0, limitCount)
+    .map((r) => ({
+      conceptId: r.conceptId,
+      conceptName: r.conceptName,
+      projectId: r.projectId,
+      projectName: r.projectName,
+      level: Number(r.level),
+    }));
+}
+
+export async function getMostRecentActiveRecommendation(ownerId: string) {
+  const [row] = await db
+    .select({
+      id: recommendations.id,
+      text: recommendations.text,
+      projectId: recommendations.projectId,
+      projectName: projects.name,
+      createdAt: recommendations.createdAt,
+    })
+    .from(recommendations)
+    .innerJoin(projects, eq(recommendations.projectId, projects.id))
+    .where(and(eq(projects.ownerId, ownerId), eq(recommendations.status, "active")))
+    .orderBy(desc(recommendations.createdAt))
+    .limit(1);
+  return row ?? null;
 }
 
 export async function getGlobalQuizStats(projectIds: string[]) {

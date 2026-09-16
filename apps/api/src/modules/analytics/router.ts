@@ -27,3 +27,8 @@ analyticsRouter.get("/analytics", async (req, res) => {
   const analytics = await service.getGlobalAnalytics(req.user!.id);
   res.json({ analytics });
 });
+
+analyticsRouter.get("/home", async (req, res) => {
+  const home = await service.getHomeOverview(req.user!.id);
+  res.json({ home });
+});

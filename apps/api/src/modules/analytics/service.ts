@@ -15,6 +15,26 @@ export async function getProjectAnalytics(projectId: string, ownerId: string) {
   return { eventCounts, assessmentStats, masterySummary, aiUsage };
 }
 
+export async function getHomeOverview(ownerId: string) {
+  const [ownedProjects, overallProgress, areasRequiringAttention, recommendedNextAction, activeProjectId] = await Promise.all([
+    listAllProjects(ownerId),
+    repo.getGlobalMasterySummary(ownerId),
+    repo.getConceptsRequiringAttention(ownerId),
+    repo.getMostRecentActiveRecommendation(ownerId),
+    repo.getRecentlyActiveProjectId(ownerId),
+  ]);
+
+  const continueLearningProject = ownedProjects.find((p) => p.id === activeProjectId) ?? ownedProjects[0] ?? null;
+
+  return {
+    recentProjects: ownedProjects.slice(0, 5),
+    continueLearningProject,
+    overallProgress,
+    areasRequiringAttention,
+    recommendedNextAction,
+  };
+}
+
 export async function getGlobalAnalytics(ownerId: string) {
   const ownedProjects = await listAllProjects(ownerId);
   const projectIds = ownedProjects.map((p) => p.id);
