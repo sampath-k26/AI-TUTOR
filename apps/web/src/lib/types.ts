@@ -246,3 +246,28 @@ export interface AdminSystemHealth {
   worker: { lastProcessedAt: string | null; status: "ok" | "stale" };
   aiProviders: { callsLastHour: number; successRateLastHour: number | null; status: "ok" | "degraded" };
 }
+
+export interface ProjectSearchResult {
+  projects: Project[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export type ActivityCategory = "projects" | "spaces";
+
+export interface ActivityItem {
+  id: string;
+  type: string;
+  projectId: string | null;
+  projectName: string | null;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ActivityResult {
+  activity: ActivityItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
