@@ -119,3 +119,13 @@ export async function getConceptById(conceptId: string) {
   const [concept] = await db.select().from(concepts).where(eq(concepts.id, conceptId)).limit(1);
   return concept;
 }
+
+export async function getConceptsByIds(conceptIds: string[]): Promise<Map<string, { name: string }>> {
+  if (conceptIds.length === 0) return new Map();
+  const rows = await db.select({ id: concepts.id, name: concepts.name }).from(concepts).where(inArray(concepts.id, conceptIds));
+  return new Map(rows.map((r) => [r.id, { name: r.name }]));
+}
+
+export async function listConceptsForProject(projectId: string) {
+  return db.select().from(concepts).where(eq(concepts.projectId, projectId));
+}

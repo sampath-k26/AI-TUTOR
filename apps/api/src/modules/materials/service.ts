@@ -41,6 +41,15 @@ export async function getConceptById(conceptId: string) {
   return repo.getConceptById(conceptId);
 }
 
+/** Bulk variant for growth/analytics views that need several concept names at once. */
+export async function getConceptsByIds(conceptIds: string[]) {
+  return repo.getConceptsByIds(conceptIds);
+}
+
+export async function listConceptsForProject(projectId: string) {
+  return repo.listConceptsForProject(projectId);
+}
+
 /**
  * Generic semantic search over a project's material — the sole owner of read
  * access to material_chunks (see CLAUDE.md module-boundary rule). Callers (ai's
