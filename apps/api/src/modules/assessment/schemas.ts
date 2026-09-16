@@ -12,6 +12,10 @@ export const questionIdParamSchema = z.object({
   questionId: z.uuid(),
 });
 
+export const recommendationIdParamSchema = z.object({
+  recommendationId: z.uuid(),
+});
+
 export const submitAnswerBodySchema = z.object({
   answer: z.string().min(1).max(4000),
 });
@@ -37,4 +41,18 @@ export const openEndedGradingSchema = z.object({
   keyConceptsCovered: z.array(z.string()),
   missingConcepts: z.array(z.string()),
   feedbackText: z.string().min(1),
+});
+
+/**
+ * A concrete next action, not vague encouragement — PRD §10's worked example:
+ * "Your understanding of Concept C has improved, but application-based
+ * questions remain difficult. Review the related material and complete
+ * another short assessment."
+ */
+export const recommendationGenerationSchema = z.object({
+  text: z.string().min(1).max(600),
+  rationale: z.object({
+    weakConcepts: z.array(z.string()),
+    repeatedMistakeConcepts: z.array(z.string()),
+  }),
 });

@@ -4,9 +4,11 @@
  * so the API stays responsive even if job processing is busy/backed up.
  */
 import { registerProcessMaterialWorker } from "./processMaterial";
+import { registerGenerateRecommendationWorker } from "./generateRecommendation";
 
 async function main() {
   await registerProcessMaterialWorker();
+  await registerGenerateRecommendationWorker();
   console.log("Worker registered and listening for jobs.");
 }
 

@@ -3,6 +3,7 @@ import { config } from "../core/config";
 
 export const QUEUE_NAMES = {
   processMaterial: "process-material",
+  generateRecommendation: "generate-recommendation",
 } as const;
 
 /**
@@ -24,6 +25,7 @@ let started: Promise<PgBoss> | null = null;
 export async function ensureBossStarted(): Promise<PgBoss> {
   started ??= boss.start().then(async (b) => {
     await b.createQueue(QUEUE_NAMES.processMaterial);
+    await b.createQueue(QUEUE_NAMES.generateRecommendation);
     return b;
   });
   return started;

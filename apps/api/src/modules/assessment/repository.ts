@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../../core/db";
-import { concepts, growthSnapshots, mastery, questions, quizzes, responses } from "../../../db/schema";
+import { concepts, growthSnapshots, mastery, questions, quizzes, recommendations, responses } from "../../../db/schema";
 import type { ConceptCandidate } from "./selection";
 
 const RECENTLY_ASKED_LIMIT = 3;
@@ -146,4 +146,73 @@ export async function insertGrowthSnapshot(params: {
     trend: params.trend,
     evidenceRef: params.evidenceRef,
   });
+}
+
+/** Latest snapshot per concept, newest first — fetched in bulk and reduced in JS rather than a DB-specific DISTINCT ON. */
+export async function getLatestGrowthByProject(projectId: string) {
+  const rows = await db
+    .select()
+    .from(growthSnapshots)
+    .where(eq(growthSnapshots.projectId, projectId))
+    .orderBy(desc(growthSnapshots.createdAt));
+
+  const latestByConceptId = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (!latestByConceptId.has(row.conceptId)) latestByConceptId.set(row.conceptId, row);
+  }
+  return [...latestByConceptId.values()];
+}
+
+const RECENT_RESPONSES_LIMIT = 20;
+
+/** Recent responses across the whole project (any quiz), newest first — feeds repeated-mistake detection. */
+export async function getRecentResponsesForProject(projectId: string) {
+  return db
+    .select({
+      conceptId: questions.conceptId,
+      isCorrect: responses.isCorrect,
+      createdAt: responses.createdAt,
+    })
+    .from(responses)
+    .innerJoin(questions, eq(responses.questionId, questions.id))
+    .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
+    .where(eq(quizzes.projectId, projectId))
+    .orderBy(desc(responses.createdAt))
+    .limit(RECENT_RESPONSES_LIMIT);
+}
+
+export async function getActiveRecommendations(projectId: string) {
+  return db
+    .select()
+    .from(recommendations)
+    .where(and(eq(recommendations.projectId, projectId), eq(recommendations.status, "active")))
+    .orderBy(desc(recommendations.createdAt));
+}
+
+const RECENT_RECOMMENDATION_TEXT_LIMIT = 10;
+
+/** Includes dismissed/completed ones too — the point is to never repeat stale advice verbatim (PRD §10). */
+export async function getRecentRecommendationTexts(projectId: string): Promise<string[]> {
+  const rows = await db
+    .select({ text: recommendations.text })
+    .from(recommendations)
+    .where(eq(recommendations.projectId, projectId))
+    .orderBy(desc(recommendations.createdAt))
+    .limit(RECENT_RECOMMENDATION_TEXT_LIMIT);
+  return rows.map((r) => r.text);
+}
+
+export async function createRecommendation(params: { projectId: string; text: string; rationale: unknown }) {
+  const [recommendation] = await db
+    .insert(recommendations)
+    .values({ projectId: params.projectId, text: params.text, rationale: params.rationale })
+    .returning();
+  return recommendation;
+}
+
+export async function dismissRecommendation(recommendationId: string, projectId: string) {
+  await db
+    .update(recommendations)
+    .set({ status: "dismissed" })
+    .where(and(eq(recommendations.id, recommendationId), eq(recommendations.projectId, projectId)));
 }

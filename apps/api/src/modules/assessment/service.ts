@@ -1,8 +1,9 @@
 import { db } from "../../core/db";
 import { events } from "../../../db/schema";
 import { getProjectForOwner } from "../learning/service";
-import { getConceptById, searchRelevantChunks } from "../materials/service";
+import { getConceptById, getConceptsByIds, searchRelevantChunks } from "../materials/service";
 import { geminiProvider, groqProvider } from "../../aiProvider";
+import { enqueueGenerateRecommendation } from "../../workers/generateRecommendation";
 import * as repo from "./repository";
 import { selectDifficulty, selectNextConcept } from "./selection";
 import { updateMastery } from "./mastery";
@@ -159,7 +160,43 @@ export async function finishQuiz(quizId: string, projectId: string, ownerId: str
 
   await repo.completeQuiz(quizId);
   await db.insert(events).values({ userId: ownerId, projectId, type: "assessment_completed", payload: { quizId } });
+
+  // Background, not synchronous: the learner doesn't need this instantly, and it's
+  // a genuine multi-step workflow (PRD §11's "Learning workflow" / "Repeated-mistake
+  // workflow") — a good fit for asynchronous processing per decision (PRD principle 4).
+  await enqueueGenerateRecommendation({ projectId });
+
   return { completed: true };
+}
+
+/** Growth Analysis (PRD §10): latest mastery + trend per concept, classified Improving/Stable/Requires Attention. */
+export async function getGrowthOverview(projectId: string, ownerId: string) {
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) return undefined;
+
+  const snapshots = await repo.getLatestGrowthByProject(projectId);
+  const conceptNames = await getConceptsByIds(snapshots.map((s) => s.conceptId));
+
+  return snapshots.map((s) => ({
+    conceptId: s.conceptId,
+    conceptName: conceptNames.get(s.conceptId)?.name ?? "Unknown concept",
+    level: Number(s.level),
+    trend: s.trend,
+    updatedAt: s.createdAt,
+  }));
+}
+
+export async function getRecommendations(projectId: string, ownerId: string) {
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) return undefined;
+  return repo.getActiveRecommendations(projectId);
+}
+
+export async function dismissRecommendation(recommendationId: string, projectId: string, ownerId: string) {
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) return undefined;
+  await repo.dismissRecommendation(recommendationId, projectId);
+  return { dismissed: true };
 }
 
 function gradeMcq(question: { answerKey: unknown }, userAnswer: string) {

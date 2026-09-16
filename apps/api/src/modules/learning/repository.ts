@@ -68,6 +68,12 @@ export async function getProjectByIdForOwner(projectId: string, ownerId: string)
   return project;
 }
 
+/** No ownership filter — for internal/background-job use only (the job was enqueued by an already-authorized request), never from a request handler. */
+export async function getProjectById(projectId: string) {
+  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+  return project;
+}
+
 export async function createProject(spaceId: string, ownerId: string, input: CreateProjectInput) {
   const [project] = await db
     .insert(projects)

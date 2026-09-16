@@ -59,3 +59,8 @@ export async function getProjectDashboard(projectId: string, ownerId: string) {
 export async function getProjectForOwner(projectId: string, ownerId: string) {
   return repo.getProjectByIdForOwner(projectId, ownerId);
 }
+
+/** Background-job entry point (no ownerId available/needed there) — see repository.getProjectById's doc comment. */
+export async function getProjectById(projectId: string) {
+  return repo.getProjectById(projectId);
+}
