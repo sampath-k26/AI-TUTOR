@@ -42,12 +42,13 @@ As of this build (Sep 2026), several packages have bumped their minimum Node ver
 | Package | Pinned | Why (latest requires) |
 |---|---|---|
 | `@supabase/supabase-js` | `2.109.0` (exact, no `^`) | `2.110.0+` requires Node `>=22.0.0` |
-| `pdfjs-dist` | `5.6.205` (exact, no `^`) | `5.7.284+` requires Node `>=22.13.0` |
+| `pdfjs-dist` | `5.5.207` (exact, no `^`) | `5.6.83–6.2.107` have a high-severity security advisory (arbitrary JS execution on a malicious PDF via `npm audit`) — matters directly since we parse user-uploaded PDFs — and separately `5.7.284+` requires Node `>=22.13.0` anyway. `5.5.207` predates the vulnerable range and is still Node-20 compatible. |
 | `pg-boss` | `^10.4.2` (stay in the `10.x` line) | `11.x`/`12.x` require Node `>=22` |
 | `vitest` | `^4.1.11` (stay in the `4.x` line) | `5.x` requires Node `^22`/`^24`/`>=26` |
+| `jsdom` (apps/web, dev) | `^29.1.1` (stay in the `29.x` line) | `30.x` requires Node `^22.22.2`/`^24.15.0`/`>=26` |
+| `@testing-library/jest-dom` (apps/web, dev) | `6.9.1` (exact, no `^`) | `6.10.0` was a **broken release**, not a normal version bump — its own deprecation notice says it mistakenly requires Node `>=22` and a new peer dep; the package's own advice is "use 6.9.1 for the 6.x line, or upgrade to 7.0.0" (7.x also requires Node `>=22`). Pinned exact so `npm install` never silently resolves back up to it. |
 | `concurrently` (if introduced) | `^9.x` line only | `10.x` requires Node `>=22` |
 | `typescript` (both apps) | `~6.0.2` (not `^7.x`) | TypeScript 7 is a new native/Go compiler; `typescript-eslint` (peer range `>=4.8.4 <6.1.0`, confirmed via its `canary` tag too) does not support it yet. Not a Node-version issue — a tooling-ecosystem gap. Revisit once typescript-eslint adds TS7 support. |
-| `pdfjs-dist` | `5.5.207` (exact, no `^`) | Also **not just a Node-version pin** — `5.6.83–6.2.107` have a high-severity advisory (arbitrary JS execution on a malicious PDF via `npm audit`), which matters directly since we parse user-uploaded PDFs. `5.5.207` predates the vulnerable range and is still Node-20 compatible. |
 
 Everything else in `apps/api/package.json`/`apps/web/package.json` was verified against `npm view <pkg> engines` at scaffold time and is fine on Node 20.19.1 at its current `latest`. If you add a **new** dependency later, run `npm view <pkg> engines` first and apply the same check before installing.
 
