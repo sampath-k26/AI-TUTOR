@@ -28,7 +28,7 @@ export function AppShell() {
           >
             <Menu className="h-4 w-4" />
           </Button>
-          <span className="text-[14px] font-semibold text-foreground">AI Study Companion</span>
+          <span className="text-[14px] font-semibold text-foreground">AI Tutor</span>
         </header>
 
         <main className="flex-1">
