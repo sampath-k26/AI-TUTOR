@@ -3,6 +3,10 @@ import { ApiError } from "../../../lib/apiClient";
 import { apiClient } from "../../../lib/apiClient";
 import type { AnswerResult, McqEvaluation, OpenEndedEvaluation, Question, Quiz } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
+import { Card, CardContent } from "../../../components/ui/card";
+import { Button } from "../../../components/ui/button";
+import { Textarea } from "../../../components/ui/textarea";
+import { Badge } from "../../../components/ui/badge";
 
 type QuizState = "idle" | "no-concepts" | "in-progress" | "completed";
 
@@ -91,70 +95,77 @@ export function QuizTab() {
   }
 
   return (
-    <div className="quiz-tab">
-      <h2>Quiz</h2>
-      {error && <p role="alert">{error}</p>}
+    <div className="flex flex-col gap-4">
+      {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
 
       {state === "idle" && (
-        <button onClick={handleStart} disabled={busy}>
+        <Button onClick={handleStart} disabled={busy} className="self-start">
           {busy ? "Starting…" : "Start Quiz"}
-        </button>
+        </Button>
       )}
 
-      {state === "no-concepts" && <p>No concepts available yet — upload and process material first.</p>}
+      {state === "no-concepts" && <p className="text-[13.5px] text-muted-foreground">No concepts available yet — upload and process material first.</p>}
 
-      {state === "completed" && <p>Quiz completed. Nice work.</p>}
+      {state === "completed" && <p className="text-[13.5px] text-foreground">Quiz completed. Nice work.</p>}
 
       {state === "in-progress" && question && (
-        <div className="quiz-question">
-          <p>
-            <em>Difficulty {question.difficulty}/5</em>
-          </p>
-          <p>{question.prompt}</p>
-
-          {!result &&
-            (question.type === "mcq" ? (
-              <div className="quiz-options">
-                {question.options?.map((opt, i) => (
-                  <label key={i}>
-                    <input type="radio" name="mcq" value={i} checked={answer === String(i)} onChange={() => setAnswer(String(i))} />
-                    {opt}
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Your answer…" />
-            ))}
-
-          {!result && (
-            <button onClick={handleSubmitAnswer} disabled={busy || !answer}>
-              {busy ? "Submitting…" : "Submit Answer"}
-            </button>
-          )}
-
-          {result && (
-            <div className="quiz-feedback">
-              {isMcqEvaluation(result.evaluation) ? (
-                <p>{result.evaluation.isCorrect ? "Correct." : `Incorrect — the correct option was #${result.evaluation.correctIndex + 1}.`}</p>
-              ) : (
-                <>
-                  <p>Understanding: {result.evaluation.understanding}</p>
-                  <p>{result.evaluation.feedbackText}</p>
-                  {result.evaluation.missingConcepts.length > 0 && <p>Missing: {result.evaluation.missingConcepts.join(", ")}</p>}
-                </>
-              )}
-              <p>
-                Mastery now {result.masteryLevel.toFixed(0)}% ({result.trend.replace("_", " ")})
-              </p>
-              <button onClick={handleNext} disabled={busy}>
-                Next Question
-              </button>
-              <button onClick={handleFinish} disabled={busy}>
-                Finish Quiz
-              </button>
+        <Card>
+          <CardContent className="flex flex-col gap-4 pt-[18px]">
+            <div>
+              <Badge variant="secondary">Difficulty {question.difficulty}/5</Badge>
+              <p className="mt-2 text-[14px] text-foreground">{question.prompt}</p>
             </div>
-          )}
-        </div>
+
+            {!result &&
+              (question.type === "mcq" ? (
+                <div className="flex flex-col gap-2">
+                  {question.options?.map((opt, i) => (
+                    <label key={i} className="flex items-center gap-2 text-[13.5px] text-foreground">
+                      <input type="radio" name="mcq" value={i} checked={answer === String(i)} onChange={() => setAnswer(String(i))} />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <Textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Your answer…" />
+              ))}
+
+            {!result && (
+              <Button onClick={handleSubmitAnswer} disabled={busy || !answer} className="self-start">
+                {busy ? "Submitting…" : "Submit Answer"}
+              </Button>
+            )}
+
+            {result && (
+              <div className="flex flex-col gap-2 border-t border-border pt-4 text-[13.5px]">
+                {isMcqEvaluation(result.evaluation) ? (
+                  <p className={result.evaluation.isCorrect ? "text-success" : "text-destructive"}>
+                    {result.evaluation.isCorrect ? "Correct." : `Incorrect — the correct option was #${result.evaluation.correctIndex + 1}.`}
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-foreground">Understanding: {result.evaluation.understanding}</p>
+                    <p className="text-foreground">{result.evaluation.feedbackText}</p>
+                    {result.evaluation.missingConcepts.length > 0 && (
+                      <p className="text-muted-foreground">Missing: {result.evaluation.missingConcepts.join(", ")}</p>
+                    )}
+                  </>
+                )}
+                <p className="text-muted-foreground">
+                  Mastery now {result.masteryLevel.toFixed(0)}% ({result.trend.replace("_", " ")})
+                </p>
+                <div className="flex gap-2">
+                  <Button onClick={handleNext} disabled={busy} variant="secondary" size="sm">
+                    Next Question
+                  </Button>
+                  <Button onClick={handleFinish} disabled={busy} variant="outline" size="sm">
+                    Finish Quiz
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

@@ -3,6 +3,11 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { supabase } from "../../lib/supabaseClient";
 import type { Space } from "../../lib/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Label } from "../../components/ui/label";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Button } from "../../components/ui/button";
 
 /**
  * M0 scope: list/create Spaces. "Continue Learning / overall progress / areas
@@ -39,42 +44,55 @@ export function HomePage() {
   }
 
   return (
-    <div className="home-page">
-      <header>
-        <h1>Your Spaces</h1>
-        <button onClick={() => supabase.auth.signOut()}>Log out</button>
+    <div className="flex flex-col gap-6">
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-foreground">Your Spaces</h1>
+        <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
+          Log out
+        </Button>
       </header>
 
-      <form onSubmit={handleCreate}>
-        <h2>Create a Space</h2>
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label>
-          Description
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} required />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={creating}>
-          {creating ? "Creating…" : "Create Space"}
-        </button>
-      </form>
+      <Card>
+        <CardHeader>
+          <CardTitle>Create a Space</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="space-name">Name</Label>
+              <Input id="space-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="space-description">Description</Label>
+              <Textarea id="space-description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            </div>
+            {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
+            <Button type="submit" disabled={creating} className="self-start">
+              {creating ? "Creating…" : "Create Space"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {spaces === null ? (
-        <p>Loading…</p>
+        <p className="text-[13.5px] text-muted-foreground">Loading…</p>
       ) : spaces.length === 0 ? (
-        <p>No Spaces yet — create your first one above.</p>
+        <p className="text-[13.5px] text-muted-foreground">No Spaces yet — create your first one above.</p>
       ) : (
-        <ul>
+        <div className="flex flex-col gap-2">
           {spaces.map((space) => (
-            <li key={space.id}>
-              <Link to={`/spaces/${space.id}`}>{space.name}</Link>
-              <p>{space.description}</p>
-            </li>
+            <Link key={space.id} to={`/spaces/${space.id}`}>
+              <Card interactive>
+                <CardHeader>
+                  <CardTitle>{space.name}</CardTitle>
+                  <CardDescription>{space.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
 }
+

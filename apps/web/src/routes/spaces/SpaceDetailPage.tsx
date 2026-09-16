@@ -2,6 +2,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import type { Project, Space } from "../../lib/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Label } from "../../components/ui/label";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Button } from "../../components/ui/button";
 
 export function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -43,50 +48,64 @@ export function SpaceDetailPage() {
     }
   }
 
-  if (notFound) return <p>Space not found.</p>;
-  if (!data) return <p>Loading…</p>;
+  if (notFound) return <p className="text-[13.5px] text-muted-foreground">Space not found.</p>;
+  if (!data) return <p className="text-[13.5px] text-muted-foreground">Loading…</p>;
 
   return (
-    <div className="space-detail-page">
-      <p>
-        <Link to="/">&larr; Your Spaces</Link>
-      </p>
-      <h1>{data.space.name}</h1>
-      <p>{data.space.description}</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link to="/" className="text-[13px] text-primary hover:underline">
+          &larr; Your Spaces
+        </Link>
+        <h1 className="mt-2 text-2xl font-semibold text-foreground">{data.space.name}</h1>
+        <p className="text-[13.5px] text-muted-foreground">{data.space.description}</p>
+      </div>
 
-      <form onSubmit={handleCreate}>
-        <h2>Create a Project</h2>
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label>
-          Description
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} required />
-        </label>
-        <label>
-          Learning goal
-          <textarea value={learningGoal} onChange={(e) => setLearningGoal(e.target.value)} required />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={creating}>
-          {creating ? "Creating…" : "Create Project"}
-        </button>
-      </form>
+      <Card>
+        <CardHeader>
+          <CardTitle>Create a Project</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="project-name">Name</Label>
+              <Input id="project-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="project-description">Description</Label>
+              <Textarea id="project-description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="project-goal">Learning goal</Label>
+              <Textarea id="project-goal" value={learningGoal} onChange={(e) => setLearningGoal(e.target.value)} required />
+            </div>
+            {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
+            <Button type="submit" disabled={creating} className="self-start">
+              {creating ? "Creating…" : "Create Project"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <h2>Projects</h2>
-      {data.projects.length === 0 ? (
-        <p>No Projects yet — create your first one above.</p>
-      ) : (
-        <ul>
-          {data.projects.map((project) => (
-            <li key={project.id}>
-              <Link to={`/projects/${project.id}`}>{project.name}</Link>
-              <p>{project.learningGoal}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div>
+        <h2 className="mb-3 text-lg font-semibold text-foreground">Projects</h2>
+        {data.projects.length === 0 ? (
+          <p className="text-[13.5px] text-muted-foreground">No Projects yet — create your first one above.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {data.projects.map((project) => (
+              <Link key={project.id} to={`/projects/${project.id}`}>
+                <Card interactive>
+                  <CardHeader>
+                    <CardTitle>{project.name}</CardTitle>
+                    <CardDescription>{project.learningGoal}</CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

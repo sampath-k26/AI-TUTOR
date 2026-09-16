@@ -11,7 +11,7 @@ This file governs every session that works on this repository. Read it before ma
 
 ## Locked technology stack (do not change without asking)
 
-- Frontend: React (Vite) + TypeScript
+- Frontend: React (Vite) + TypeScript, styled with Tailwind CSS v3 + a small shadcn/ui-style component set (`src/components/ui/`: button, card, input, textarea, label, badge). Design tokens (HSL CSS variables in `src/index.css`, mapped in `tailwind.config.js`) are adapted from a reference "Linear-grade" design language (near-black canvas, four-step surface ladder, hairline borders instead of shadows, a single lavender-blue accent `#5e6ad2`) — read `~/Documents/Zopkit/Project-Management-master` for the original if extending this further, but never write to that repo. Dark mode follows OS preference (`darkMode: 'media'`) — there is no manual theme toggle, and none should be added without asking (scope discipline).
 - Backend: Node.js + Express + TypeScript, modular monolith
 - DB/Auth/Storage: Supabase (Postgres + pgvector, Auth with RLS, Storage)
 - Background jobs: pg-boss (Postgres-native, no Redis)

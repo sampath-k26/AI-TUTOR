@@ -1,210 +1,117 @@
-:root {
-  --text: #3f3f46;
-  --text-h: #09090b;
-  --text-muted: #71717a;
-  --bg: #fff;
-  --bg-subtle: #f4f4f5;
-  --border: #e4e4e7;
-  --accent: #6d28d9;
-  --danger: #b91c1c;
-  --success: #15803d;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+/* ============================================================
+   Design tokens adapted from a reference "Linear-grade" design
+   language: near-black canvas, four-step surface ladder, hairline
+   borders instead of shadows, a single chromatic accent. Trimmed to
+   what this app actually uses (no sidebar/status/priority/chart
+   tokens — this isn't a kanban board). Dark mode follows OS
+   preference (`media`), not a manual toggle — see tailwind.config.js.
+   ============================================================ */
 
-  font: 16px/145% var(--sans);
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  -webkit-font-smoothing: antialiased;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --text: #d4d4d8;
-    --text-h: #fafafa;
-    --text-muted: #a1a1aa;
-    --bg: #18181b;
-    --bg-subtle: #27272a;
-    --border: #3f3f46;
-    --accent: #c4b5fd;
-    --danger: #f87171;
-    --success: #4ade80;
+    --background: 240 14% 99%;
+    --foreground: 225 10% 8%;
+
+    --surface-1: 0 0% 100%;
+    --surface-2: 220 20% 97%;
+    --surface-3: 216 17% 94%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 225 10% 8%;
+
+    --primary: 234 56% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 234 100% 75%;
+
+    --secondary: 220 20% 97%;
+    --secondary-foreground: 225 10% 8%;
+
+    --muted: 220 20% 97%;
+    --muted-foreground: 220 9% 46%;
+    --subtle-foreground: 219 9% 64%;
+
+    --accent: 231 48% 95%;
+    --accent-foreground: 234 56% 60%;
+
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-muted: 357 56% 94%;
+
+    --success: 150 43% 51%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 152 35% 93%;
+
+    --warning: 45 86% 62%;
+    --warning-foreground: 225 10% 8%;
+    --warning-muted: 44 66% 94%;
+
+    --border: 228 12% 92%;
+    --border-strong: 225 11% 86%;
+    --input: 228 12% 92%;
+    --ring: 234 56% 60%;
   }
-}
 
-* {
-  box-sizing: border-box;
-}
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 210 11% 4%;
+      --foreground: 180 7% 97%;
 
-body {
-  margin: 0;
+      --surface-1: 210 6% 6%;
+      --surface-2: 210 5% 8%;
+      --surface-3: 220 5% 11%;
+
+      --card: 210 6% 6%;
+      --card-foreground: 180 7% 97%;
+
+      --primary: 234 56% 60%;
+      --primary-foreground: 0 0% 100%;
+      --primary-hover: 234 100% 75%;
+
+      --secondary: 210 5% 8%;
+      --secondary-foreground: 180 7% 97%;
+
+      --muted: 210 5% 8%;
+      --muted-foreground: 219 6% 57%;
+      --subtle-foreground: 218 5% 41%;
+
+      --accent: 230 31% 11%;
+      --accent-foreground: 234 100% 75%;
+
+      --destructive: 358 75% 59%;
+      --destructive-foreground: 0 0% 100%;
+      --destructive-muted: 357 35% 10%;
+
+      --success: 150 43% 51%;
+      --success-foreground: 0 0% 100%;
+      --success-muted: 154 30% 9%;
+
+      --warning: 45 86% 62%;
+      --warning-foreground: 210 11% 4%;
+      --warning-muted: 47 33% 11%;
+
+      --border: 223 9% 15%;
+      --border-strong: 218 8% 22%;
+      --input: 223 9% 15%;
+      --ring: 234 56% 60%;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+  }
 }
 
 #root {
   max-width: 860px;
   margin: 0 auto;
   padding: 24px 16px 64px;
-}
-
-h1, h2 {
-  color: var(--text-h);
-  font-weight: 600;
-  margin: 0 0 8px;
-}
-
-h1 {
-  font-size: 28px;
-}
-
-h2 {
-  font-size: 20px;
-  margin-top: 24px;
-}
-
-a {
-  color: var(--accent);
-}
-
-p {
-  margin: 8px 0;
-}
-
-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-start;
-  margin: 12px 0;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--text-muted);
-  flex: 1 1 160px;
-}
-
-input[type="text"],
-input[type="email"],
-input[type="password"],
-textarea {
-  font: inherit;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-}
-
-button {
-  font: inherit;
-  padding: 8px 14px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  cursor: pointer;
-  align-self: flex-end;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-ul {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0;
-}
-
-li {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
-
-[role="alert"] {
-  color: var(--danger);
-}
-
-.project-tabs {
-  display: flex;
-  gap: 16px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-  margin: 16px 0;
-}
-
-.project-tabs a {
-  text-decoration: none;
-  color: var(--text-muted);
-  padding-bottom: 8px;
-}
-
-.project-tabs a.active {
-  color: var(--text-h);
-  border-bottom: 2px solid var(--accent);
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: var(--bg-subtle);
-}
-.status-ready { color: var(--success); }
-.status-failed { color: var(--danger); }
-
-.tutor-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 16px 0;
-}
-
-.tutor-message {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--bg-subtle);
-}
-
-.tutor-message-user {
-  align-self: flex-end;
-  background: var(--accent);
-  color: #fff;
-}
-
-.tutor-citations {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-top: 6px;
-}
-
-.tutor-insufficient-evidence {
-  font-style: italic;
-  color: var(--text-muted);
-}
-
-.quiz-options {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 12px 0;
-}
-
-.quiz-options label {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
-.quiz-feedback {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
 }

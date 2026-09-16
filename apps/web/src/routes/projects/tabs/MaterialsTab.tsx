@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
 import type { Material } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
+import { Card, CardContent } from "../../../components/ui/card";
+import { Button } from "../../../components/ui/button";
+import { Badge } from "../../../components/ui/badge";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -48,35 +51,43 @@ export function MaterialsTab() {
   }
 
   return (
-    <div className="materials-tab">
-      <h2>Materials</h2>
-      <div>
-        <input ref={fileInputRef} type="file" accept="application/pdf" />
-        <button onClick={handleUpload} disabled={uploading}>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          className="text-[13px] text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface-1 file:px-3 file:py-1.5 file:text-[13px] file:font-medium file:text-foreground"
+        />
+        <Button onClick={handleUpload} disabled={uploading} size="sm">
           {uploading ? "Uploading…" : "Upload PDF"}
-        </button>
+        </Button>
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
 
       {materials === null ? (
-        <p>Loading…</p>
+        <p className="text-[13.5px] text-muted-foreground">Loading…</p>
       ) : materials.length === 0 ? (
-        <p>No materials yet — upload a PDF to get started.</p>
+        <p className="text-[13.5px] text-muted-foreground">No materials yet — upload a PDF to get started.</p>
       ) : (
-        <ul>
+        <div className="flex flex-col gap-2">
           {materials.map((m) => (
-            <li key={m.id}>
-              {m.originalFilename} — <StatusBadge status={m.status} />
-              {m.status === "failed" && m.errorDetail && <span> ({m.errorDetail})</span>}
-              {m.status === "ready" && m.pageCount != null && <span> · {m.pageCount} pages</span>}
-            </li>
+            <Card key={m.id}>
+              <CardContent className="flex items-center gap-2 pt-[18px] text-[13.5px]">
+                <span className="text-foreground">{m.originalFilename}</span>
+                <StatusBadge status={m.status} />
+                {m.status === "failed" && m.errorDetail && <span className="text-muted-foreground">({m.errorDetail})</span>}
+                {m.status === "ready" && m.pageCount != null && <span className="text-muted-foreground">· {m.pageCount} pages</span>}
+              </CardContent>
+            </Card>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: Material["status"] }) {
-  return <span className={`status-badge status-${status}`}>{status}</span>;
+  const variant = status === "ready" ? "success" : status === "failed" ? "destructive" : "secondary";
+  return <Badge variant={variant}>{status}</Badge>;
 }

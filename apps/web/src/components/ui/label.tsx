@@ -1,0 +1,8 @@
+import * as React from "react";
+import { cn } from "../../lib/utils";
+
+/** A label names a control; it never competes with it. */
+export const Label = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttributes<HTMLLabelElement>>(({ className, ...props }, ref) => (
+  <label ref={ref} className={cn("text-[12.5px] font-medium leading-none text-muted-foreground", className)} {...props} />
+));
+Label.displayName = "Label";
