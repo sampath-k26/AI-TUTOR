@@ -54,7 +54,15 @@ export async function markFailed(materialId: string, errorDetail: string) {
   await db.update(materials).set({ status: "failed", errorDetail }).where(eq(materials.id, materialId));
 }
 
+/**
+ * Deletes any chunks already stored for this material before inserting the
+ * freshly-embedded set — makes the write idempotent under pg-boss's
+ * at-least-once delivery (a redelivered processMaterial job re-embeds from
+ * scratch; without this it would silently double up every chunk, degrading
+ * Tutor retrieval with duplicate context rather than failing loudly).
+ */
 export async function insertChunks(materialId: string, projectId: string, chunks: Array<Chunk & { embedding: number[] }>) {
+  await db.delete(materialChunks).where(eq(materialChunks.materialId, materialId));
   if (chunks.length === 0) return;
   await db.insert(materialChunks).values(
     chunks.map((c) => ({
