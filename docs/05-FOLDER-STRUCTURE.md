@@ -7,16 +7,11 @@ AI-TUTOR/
 ├── apps/
 │   ├── web/                              # React (Vite) + TypeScript frontend
 │   │   ├── src/
-│   │   │   ├── routes/                   # React Router route components
-│   │   │   │   ├── auth/                 # login/signup
+│   │   │   ├── routes/                   # React Router route components (routes are declared in App.tsx, not inferred from folders — this is a plain SPA, not file-based routing)
+│   │   │   │   ├── auth/                 # login/signup pages
 │   │   │   │   ├── home/                 # User Home ("where was I / how am I doing / next")
-│   │   │   │   ├── spaces/[spaceId]/
-│   │   │   │   ├── projects/[projectId]/
-│   │   │   │   │   ├── materials/
-│   │   │   │   │   ├── tutor/
-│   │   │   │   │   ├── quiz/
-│   │   │   │   │   ├── growth/
-│   │   │   │   │   └── analytics/
+│   │   │   │   ├── spaces/                # SpaceDetailPage (reads :spaceId via useParams)
+│   │   │   │   ├── projects/              # ProjectLayout (:projectId, tab nav) + tab pages: materials, tutor, quiz, growth, analytics
 │   │   │   │   └── admin/                # Admin Dashboard (role-gated)
 │   │   │   ├── components/
 │   │   │   │   ├── ui/                   # generic design-system components

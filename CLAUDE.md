@@ -35,6 +35,22 @@ npm -v    →  10.8.2
 - When choosing a package version, verify it supports Node 20 before installing (check the package's `engines` field or release notes) — do not install a package that requires a newer Node major version.
 - Package manager is **npm** (via npm workspaces) — pnpm and yarn are not installed locally; do not introduce them.
 
+### Packages pinned below `latest` because of the Node 20 constraint
+
+As of this build (Sep 2026), several packages have bumped their minimum Node version to 22+ (Node 20 hit EOL this year). These are pinned to the last version compatible with Node 20.19.1 — **do not run `npm update` or `npm install <pkg>@latest` on these**, it will silently pull in a version that doesn't run on this machine:
+
+| Package | Pinned | Why (latest requires) |
+|---|---|---|
+| `@supabase/supabase-js` | `2.109.0` (exact, no `^`) | `2.110.0+` requires Node `>=22.0.0` |
+| `pdfjs-dist` | `5.6.205` (exact, no `^`) | `5.7.284+` requires Node `>=22.13.0` |
+| `pg-boss` | `^10.4.2` (stay in the `10.x` line) | `11.x`/`12.x` require Node `>=22` |
+| `vitest` | `^4.1.11` (stay in the `4.x` line) | `5.x` requires Node `^22`/`^24`/`>=26` |
+| `concurrently` (if introduced) | `^9.x` line only | `10.x` requires Node `>=22` |
+| `typescript` (both apps) | `~6.0.2` (not `^7.x`) | TypeScript 7 is a new native/Go compiler; `typescript-eslint` (peer range `>=4.8.4 <6.1.0`, confirmed via its `canary` tag too) does not support it yet. Not a Node-version issue — a tooling-ecosystem gap. Revisit once typescript-eslint adds TS7 support. |
+| `pdfjs-dist` | `5.5.207` (exact, no `^`) | Also **not just a Node-version pin** — `5.6.83–6.2.107` have a high-severity advisory (arbitrary JS execution on a malicious PDF via `npm audit`), which matters directly since we parse user-uploaded PDFs. `5.5.207` predates the vulnerable range and is still Node-20 compatible. |
+
+Everything else in `apps/api/package.json`/`apps/web/package.json` was verified against `npm view <pkg> engines` at scaffold time and is fine on Node 20.19.1 at its current `latest`. If you add a **new** dependency later, run `npm view <pkg> engines` first and apply the same check before installing.
+
 ## Environment variables / secrets
 
 - Real credentials (Supabase URL/keys, Gemini API key, Groq API key) are **not available yet** — the user fills `.env` files in personally, at the end of implementation, right before the testing phase begins.
