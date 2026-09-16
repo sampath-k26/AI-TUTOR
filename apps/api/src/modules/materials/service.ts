@@ -36,6 +36,11 @@ export async function getFilenamesByIds(materialIds: string[]) {
   return repo.getFilenamesByIds(materialIds);
 }
 
+/** Used by other modules (e.g. assessment, for question-generation prompts) instead of querying concepts directly. */
+export async function getConceptById(conceptId: string) {
+  return repo.getConceptById(conceptId);
+}
+
 /**
  * Generic semantic search over a project's material — the sole owner of read
  * access to material_chunks (see CLAUDE.md module-boundary rule). Callers (ai's

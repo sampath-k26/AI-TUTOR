@@ -114,3 +114,8 @@ export async function insertConcepts(projectId: string, materialId: string, name
     })),
   );
 }
+
+export async function getConceptById(conceptId: string) {
+  const [concept] = await db.select().from(concepts).where(eq(concepts.id, conceptId)).limit(1);
+  return concept;
+}
