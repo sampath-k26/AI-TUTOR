@@ -14,10 +14,18 @@
   "scripts": {
     "dev:web": "npm run dev --workspace apps/web",
     "dev:api": "npm run dev --workspace apps/api",
+    "worker": "npm run worker --workspace apps/api",
     "build:web": "npm run build --workspace apps/web",
     "build:api": "npm run build --workspace apps/api",
     "test:web": "npm run test --workspace apps/web",
     "test:api": "npm run test --workspace apps/api",
+    "lint:web": "npm run lint --workspace apps/web",
+    "lint:api": "npm run lint --workspace apps/api",
+    "typecheck:web": "npm run build --workspace apps/web",
+    "typecheck:api": "npm run typecheck --workspace apps/api",
+    "seed": "npm run seed --workspace apps/api",
+    "eval": "npm run eval --workspace apps/api",
+    "db:migrate": "npm run db:migrate --workspace apps/api",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down"
   }
