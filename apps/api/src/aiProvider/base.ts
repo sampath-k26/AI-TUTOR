@@ -69,11 +69,32 @@ export class AiGenerationError extends Error {
 }
 
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
-const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_MAX_ATTEMPTS = 4;
 const BASE_DELAY_MS = 500;
+// Free-tier 429s are rate-limit quota resets, not transient blips — Gemini's own
+// error payload has said "Please retry in 5.5s" (observed live running the seed
+// script's back-to-back AI calls against the free tier's 5 requests/minute/model
+// cap). A sub-second backoff can't outlast that, so 429s get a much longer wait.
+const RATE_LIMIT_BASE_DELAY_MS = 3_000;
+
+function getStatus(err: unknown): number | undefined {
+  return (err as { status?: number })?.status;
+}
+
+/**
+ * A 429 whose quotaId contains "PerDay" is Gemini's free-tier *daily* cap (seen
+ * live: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", limit 20/day for
+ * gemini-3.6-flash) — distinct from the per-minute cap. No backoff within a
+ * request's lifetime can outlast a 24h reset, so retrying it is pure waste:
+ * every attempt fails identically and just delays surfacing the real error.
+ */
+function isDailyQuotaExhausted(err: unknown): boolean {
+  return getStatus(err) === 429 && err instanceof Error && /PerDay/i.test(err.message);
+}
 
 function isRetryable(err: unknown): boolean {
-  const status = (err as { status?: number })?.status;
+  if (isDailyQuotaExhausted(err)) return false;
+  const status = getStatus(err);
   if (typeof status === "number") return RETRYABLE_STATUS_CODES.has(status);
   // Network-level failures (no HTTP status at all) are also worth retrying once or twice.
   return err instanceof Error && /network|timeout|ECONNRESET|ETIMEDOUT/i.test(err.message);
@@ -82,11 +103,11 @@ function isRetryable(err: unknown): boolean {
 /**
  * PRD §13 explicitly calls out "AI timeouts, provider failures" as failure modes
  * requiring "reasonable timeouts, retries ... recovery mechanisms" — verified live
- * against a real transient Gemini 503 ("high demand") during development, which
- * is exactly the failure mode this exists to smooth over. Exponential backoff,
- * only for retryable (5xx/429/network) errors — a genuine 4xx (bad request,
- * invalid schema) fails immediately rather than retrying a request that can
- * never succeed.
+ * against a real transient Gemini 503 ("high demand") and, separately, real 429
+ * rate-limit exhaustion during development, which is exactly the failure mode
+ * this exists to smooth over. Exponential backoff, only for retryable (5xx/429/
+ * network) errors — a genuine 4xx (bad request, invalid schema) fails immediately
+ * rather than retrying a request that can never succeed.
  */
 export async function withRetry<T>(fn: () => Promise<T>, maxAttempts = DEFAULT_MAX_ATTEMPTS): Promise<T> {
   let lastError: unknown;
@@ -96,7 +117,8 @@ export async function withRetry<T>(fn: () => Promise<T>, maxAttempts = DEFAULT_M
     } catch (err) {
       lastError = err;
       if (attempt === maxAttempts || !isRetryable(err)) throw err;
-      await new Promise((resolve) => setTimeout(resolve, BASE_DELAY_MS * 2 ** (attempt - 1)));
+      const base = getStatus(err) === 429 ? RATE_LIMIT_BASE_DELAY_MS : BASE_DELAY_MS;
+      await new Promise((resolve) => setTimeout(resolve, base * 2 ** (attempt - 1)));
     }
   }
   throw lastError;
