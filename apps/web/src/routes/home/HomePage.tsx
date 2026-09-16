@@ -2,21 +2,17 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { supabase } from "../../lib/supabaseClient";
+import { useProfile } from "../../lib/ProfileContext";
 import type { Space } from "../../lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
+import { HomeOverview } from "./HomeOverview";
 
-/**
- * M0 scope: list/create Spaces. "Continue Learning / overall progress / areas
- * requiring attention / recommended next action" widgets are added in M5
- * once Projects/Quiz/Mastery/Recommendations exist to populate them (see
- * docs/06-IMPLEMENTATION-PLAN.md) — not stubbed here to avoid a dashboard
- * that silently lies about having no data.
- */
 export function HomePage() {
+  const profile = useProfile();
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -48,6 +44,13 @@ export function HomePage() {
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-foreground">Your Spaces</h1>
         <div className="flex items-center gap-2">
+          {profile?.role === "admin" && (
+            <Link to="/admin">
+              <Button variant="outline" size="sm">
+                Admin Dashboard
+              </Button>
+            </Link>
+          )}
           <Link to="/analytics">
             <Button variant="outline" size="sm">
               Global Analytics
@@ -58,6 +61,8 @@ export function HomePage() {
           </Button>
         </div>
       </header>
+
+      <HomeOverview />
 
       <Card>
         <CardHeader>

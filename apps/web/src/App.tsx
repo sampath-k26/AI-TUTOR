@@ -11,6 +11,12 @@ import { QuizTab } from "./routes/projects/tabs/QuizTab";
 import { GrowthTab } from "./routes/projects/tabs/GrowthTab";
 import { AnalyticsTab } from "./routes/projects/tabs/AnalyticsTab";
 import { GlobalAnalyticsPage } from "./routes/analytics/GlobalAnalyticsPage";
+import { AdminLayout } from "./routes/admin/AdminLayout";
+import { UsersTab } from "./routes/admin/tabs/UsersTab";
+import { SpacesProjectsTab } from "./routes/admin/tabs/SpacesProjectsTab";
+import { ActivityTab } from "./routes/admin/tabs/ActivityTab";
+import { EngagementTab } from "./routes/admin/tabs/EngagementTab";
+import { AiSystemTab } from "./routes/admin/tabs/AiSystemTab";
 
 export function App() {
   return (
@@ -56,6 +62,21 @@ export function App() {
           <Route path="quiz" element={<QuizTab />} />
           <Route path="growth" element={<GrowthTab />} />
           <Route path="analytics" element={<AnalyticsTab />} />
+        </Route>
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<UsersTab />} />
+          <Route path="spaces-projects" element={<SpacesProjectsTab />} />
+          <Route path="activity" element={<ActivityTab />} />
+          <Route path="engagement" element={<EngagementTab />} />
+          <Route path="ai-system" element={<AiSystemTab />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -143,3 +143,106 @@ export interface GlobalAnalytics {
   masterySummary: { conceptCount: number; averageMastery: number | null };
   quizStats: { totalQuizzes: number; completedQuizzes: number };
 }
+
+export interface AttentionConcept {
+  conceptId: string;
+  conceptName: string;
+  projectId: string;
+  projectName: string;
+  level: number;
+}
+
+export interface RecommendedNextAction {
+  id: string;
+  text: string;
+  projectId: string;
+  projectName: string;
+  createdAt: string;
+}
+
+export interface HomeOverview {
+  recentProjects: Project[];
+  continueLearningProject: Project | null;
+  overallProgress: { conceptCount: number; averageMastery: number | null };
+  areasRequiringAttention: AttentionConcept[];
+  recommendedNextAction: RecommendedNextAction | null;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: "user" | "admin";
+  createdAt: string;
+}
+
+export interface AdminSpace {
+  id: string;
+  name: string;
+  description: string;
+  ownerId: string;
+  ownerEmail: string;
+  createdAt: string;
+}
+
+export interface AdminProject {
+  id: string;
+  name: string;
+  status: "active" | "archived";
+  spaceId: string;
+  spaceName: string;
+  ownerId: string;
+  ownerEmail: string;
+  createdAt: string;
+}
+
+export interface AdminActivityEvent {
+  id: string;
+  type: string;
+  userId: string;
+  userEmail: string;
+  projectId: string | null;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AdminEngagement {
+  totalUsers: number;
+  activeUsersLast24h: number;
+  activeUsersLast7d: number;
+  activeUsersLast30d: number;
+  totalSpaces: number;
+  totalProjects: number;
+}
+
+export interface AdminLearningAnalytics {
+  conceptCount: number;
+  averageMastery: number | null;
+  totalQuizzes: number;
+  completedQuizzes: number;
+  totalMaterials: number;
+}
+
+export interface AdminAiUsage {
+  callCount: number;
+  successCount: number;
+  totalCostUsd: number;
+  averageLatencyMs: number | null;
+  byProvider: Array<{ provider: string; feature: string; callCount: number; successCount: number }>;
+  recentErrors: Array<{ id: string; provider: string; feature: string; errorDetail: string | null; createdAt: string }>;
+}
+
+export interface AdminAiEvaluation {
+  lastRunAt: string | null;
+  bySuite: Array<{ suite: string; verdict: string; count: number; averageScore: number | null }>;
+}
+
+export interface AdminBackgroundJobs {
+  queueCounts: Array<{ queue: string; state: string; count: number }>;
+  recentFailedJobs: Array<{ id: string; queue: string; output: unknown; completedOn: string | null }>;
+}
+
+export interface AdminSystemHealth {
+  database: "ok";
+  worker: { lastProcessedAt: string | null; status: "ok" | "stale" };
+  aiProviders: { callsLastHour: number; successRateLastHour: number | null; status: "ok" | "degraded" };
+}
