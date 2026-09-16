@@ -8,6 +8,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>AI Study Companion</title>
+    <script>
+      // Runs before first paint to avoid a flash of the wrong theme — kept in sync
+      // with the storage key/logic in src/lib/ThemeContext.tsx.
+      (function () {
+        try {
+          var stored = localStorage.getItem('ai-tutor-theme');
+          var isDark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.toggle('dark', isDark);
+        } catch (e) {
+          // localStorage unavailable — fall back to light, ThemeProvider corrects it after mount.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,8 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
-import { supabase } from "../../lib/supabaseClient";
-import { useProfile } from "../../lib/ProfileContext";
 import type { Space } from "../../lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
@@ -12,7 +10,6 @@ import { Button } from "../../components/ui/button";
 import { HomeOverview } from "./HomeOverview";
 
 export function HomePage() {
-  const profile = useProfile();
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -41,26 +38,7 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Your Spaces</h1>
-        <div className="flex items-center gap-2">
-          {profile?.role === "admin" && (
-            <Link to="/admin">
-              <Button variant="outline" size="sm">
-                Admin Dashboard
-              </Button>
-            </Link>
-          )}
-          <Link to="/analytics">
-            <Button variant="outline" size="sm">
-              Global Analytics
-            </Button>
-          </Link>
-          <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
-            Log out
-          </Button>
-        </div>
-      </header>
+      <h1 className="text-2xl font-semibold text-foreground">Your Spaces</h1>
 
       <HomeOverview />
 

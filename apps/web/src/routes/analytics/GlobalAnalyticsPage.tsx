@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import type { GlobalAnalytics } from "../../lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -28,12 +27,7 @@ export function GlobalAnalyticsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link to="/" className="text-[13px] text-primary hover:underline">
-          &larr; Back to Spaces
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground">Global Analytics</h1>
-      </div>
+      <h1 className="text-2xl font-semibold text-foreground">Global Analytics</h1>
 
       {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
       {!error && !analytics && <p className="text-[13.5px] text-muted-foreground">Loading…</p>}

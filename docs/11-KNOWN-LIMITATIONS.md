@@ -40,8 +40,7 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 
 ## UI
 
-- No manual light/dark theme toggle — the app follows OS preference only (a deliberate scope decision, not an oversight).
-- No dedicated mobile layout pass beyond Tailwind's responsive utilities applied ad hoc per component.
+- No dedicated mobile layout pass beyond Tailwind's responsive utilities applied ad hoc per component and the sidebar's own mobile drawer.
 - Activity/analytics lists aren't paginated on the frontend yet — fine at prototype data volumes, would need it at real scale.
 
 ## Background processing

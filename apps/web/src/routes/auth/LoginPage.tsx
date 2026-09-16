@@ -29,7 +29,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto mt-16 max-w-sm">
+    <div className="mx-auto mt-16 max-w-sm px-4">
       <Card>
         <CardHeader>
           <CardTitle>Log in</CardTitle>

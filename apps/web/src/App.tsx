@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ThemeProvider } from "./lib/ThemeContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
+import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./routes/auth/LoginPage";
 import { SignupPage } from "./routes/auth/SignupPage";
 import { HomePage } from "./routes/home/HomePage";
@@ -20,66 +22,41 @@ import { AiSystemTab } from "./routes/admin/tabs/AiSystemTab";
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/spaces/:spaceId"
-          element={
-            <ProtectedRoute>
-              <SpaceDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <GlobalAnalyticsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects/:projectId"
-          element={
-            <ProtectedRoute>
-              <ProjectLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="materials" replace />} />
-          <Route path="materials" element={<MaterialsTab />} />
-          <Route path="tutor" element={<TutorTab />} />
-          <Route path="quiz" element={<QuizTab />} />
-          <Route path="growth" element={<GrowthTab />} />
-          <Route path="analytics" element={<AnalyticsTab />} />
-        </Route>
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="users" replace />} />
-          <Route path="users" element={<UsersTab />} />
-          <Route path="spaces-projects" element={<SpacesProjectsTab />} />
-          <Route path="activity" element={<ActivityTab />} />
-          <Route path="engagement" element={<EngagementTab />} />
-          <Route path="ai-system" element={<AiSystemTab />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<HomePage />} />
+            <Route path="/spaces/:spaceId" element={<SpaceDetailPage />} />
+            <Route path="/analytics" element={<GlobalAnalyticsPage />} />
+            <Route path="/projects/:projectId" element={<ProjectLayout />}>
+              <Route index element={<Navigate to="materials" replace />} />
+              <Route path="materials" element={<MaterialsTab />} />
+              <Route path="tutor" element={<TutorTab />} />
+              <Route path="quiz" element={<QuizTab />} />
+              <Route path="growth" element={<GrowthTab />} />
+              <Route path="analytics" element={<AnalyticsTab />} />
+            </Route>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="users" replace />} />
+              <Route path="users" element={<UsersTab />} />
+              <Route path="spaces-projects" element={<SpacesProjectsTab />} />
+              <Route path="activity" element={<ActivityTab />} />
+              <Route path="engagement" element={<EngagementTab />} />
+              <Route path="ai-system" element={<AiSystemTab />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

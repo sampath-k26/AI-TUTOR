@@ -1,4 +1,4 @@
-import { Link, Navigate, NavLink, Outlet } from "react-router-dom";
+import { Navigate, NavLink, Outlet } from "react-router-dom";
 import { useProfile } from "../../lib/ProfileContext";
 import { cn } from "../../lib/utils";
 
@@ -24,12 +24,7 @@ export function AdminLayout() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link to="/" className="text-[13px] text-primary hover:underline">
-          &larr; Back to Spaces
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground">Admin Dashboard</h1>
-      </div>
+      <h1 className="text-2xl font-semibold text-foreground">Admin Dashboard</h1>
 
       <nav className="flex flex-wrap gap-5 border-b border-border">
         {TABS.map((tab) => (

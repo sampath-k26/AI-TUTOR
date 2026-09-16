@@ -5,10 +5,9 @@
 /* ============================================================
    Design tokens adapted from a reference "Linear-grade" design
    language: near-black canvas, four-step surface ladder, hairline
-   borders instead of shadows, a single chromatic accent. Trimmed to
-   what this app actually uses (no sidebar/status/priority/chart
-   tokens — this isn't a kanban board). Dark mode follows OS
-   preference (`media`), not a manual toggle — see tailwind.config.js.
+   borders instead of shadows, a single chromatic accent. Dark mode is
+   a manual toggle (`.dark` class on <html>, see lib/ThemeContext.tsx),
+   defaulting to OS preference on first visit — see tailwind.config.js.
    ============================================================ */
 
 @layer base {
@@ -55,49 +54,47 @@
     --ring: 234 56% 60%;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: 210 11% 4%;
-      --foreground: 180 7% 97%;
+  .dark {
+    --background: 210 11% 4%;
+    --foreground: 180 7% 97%;
 
-      --surface-1: 210 6% 6%;
-      --surface-2: 210 5% 8%;
-      --surface-3: 220 5% 11%;
+    --surface-1: 210 6% 6%;
+    --surface-2: 210 5% 8%;
+    --surface-3: 220 5% 11%;
 
-      --card: 210 6% 6%;
-      --card-foreground: 180 7% 97%;
+    --card: 210 6% 6%;
+    --card-foreground: 180 7% 97%;
 
-      --primary: 234 56% 60%;
-      --primary-foreground: 0 0% 100%;
-      --primary-hover: 234 100% 75%;
+    --primary: 234 56% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 234 100% 75%;
 
-      --secondary: 210 5% 8%;
-      --secondary-foreground: 180 7% 97%;
+    --secondary: 210 5% 8%;
+    --secondary-foreground: 180 7% 97%;
 
-      --muted: 210 5% 8%;
-      --muted-foreground: 219 6% 57%;
-      --subtle-foreground: 218 5% 41%;
+    --muted: 210 5% 8%;
+    --muted-foreground: 219 6% 57%;
+    --subtle-foreground: 218 5% 41%;
 
-      --accent: 230 31% 11%;
-      --accent-foreground: 234 100% 75%;
+    --accent: 230 31% 11%;
+    --accent-foreground: 234 100% 75%;
 
-      --destructive: 358 75% 59%;
-      --destructive-foreground: 0 0% 100%;
-      --destructive-muted: 357 35% 10%;
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-muted: 357 35% 10%;
 
-      --success: 150 43% 51%;
-      --success-foreground: 0 0% 100%;
-      --success-muted: 154 30% 9%;
+    --success: 150 43% 51%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 154 30% 9%;
 
-      --warning: 45 86% 62%;
-      --warning-foreground: 210 11% 4%;
-      --warning-muted: 47 33% 11%;
+    --warning: 45 86% 62%;
+    --warning-foreground: 210 11% 4%;
+    --warning-muted: 47 33% 11%;
 
-      --border: 223 9% 15%;
-      --border-strong: 218 8% 22%;
-      --input: 223 9% 15%;
-      --ring: 234 56% 60%;
-    }
+    --border: 223 9% 15%;
+    --border-strong: 218 8% 22%;
+    --input: 223 9% 15%;
+    --ring: 234 56% 60%;
   }
 
   * {
@@ -110,8 +107,8 @@
   }
 }
 
+/* AppShell owns width/padding for authenticated pages (sidebar + content need full
+   viewport width); unauthenticated pages (login/signup) size themselves. */
 #root {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 24px 16px 64px;
+  min-height: 100vh;
 }

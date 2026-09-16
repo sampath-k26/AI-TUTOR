@@ -37,7 +37,7 @@ export function SignupPage() {
 
   if (confirmationSent) {
     return (
-      <div className="mx-auto mt-16 max-w-sm">
+      <div className="mx-auto mt-16 max-w-sm px-4">
         <Card>
           <CardContent className="pt-[18px]">
             <p className="text-[13.5px] text-foreground">Check your email to confirm your account, then log in.</p>
@@ -48,7 +48,7 @@ export function SignupPage() {
   }
 
   return (
-    <div className="mx-auto mt-16 max-w-sm">
+    <div className="mx-auto mt-16 max-w-sm px-4">
       <Card>
         <CardHeader>
           <CardTitle>Sign up</CardTitle>

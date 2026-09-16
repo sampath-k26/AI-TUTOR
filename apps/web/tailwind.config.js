@@ -1,9 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  // Automatic (OS-preference) dark mode, not a manual toggle — see docs/02-DECISIONS-LOG.md
-  // scope discipline: a theme-toggle UI isn't needed for this prototype.
-  darkMode: 'media',
+  // Manual toggle via a `.dark` class on <html> (see lib/ThemeContext.tsx) — defaults
+  // to OS preference on first visit, then remembers the user's explicit choice.
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
