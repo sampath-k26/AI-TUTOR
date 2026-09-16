@@ -4,6 +4,7 @@ import { apiClient } from "../../lib/apiClient";
 import type { HomeOverview as HomeOverviewData } from "../../lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { Skeleton } from "../../components/ui/skeleton";
 
 /**
  * "Continue Learning / Recent Projects / overall progress / areas requiring
@@ -12,10 +13,24 @@ import { Badge } from "../../components/ui/badge";
  */
 export function HomeOverview() {
   const [overview, setOverview] = useState<HomeOverviewData | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    apiClient.get<{ home: HomeOverviewData }>("/home").then((res) => setOverview(res.home));
+    apiClient
+      .get<{ home: HomeOverviewData }>("/home")
+      .then((res) => setOverview(res.home))
+      .finally(() => setLoaded(true));
   }, []);
+
+  if (!loaded) {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
 
   if (!overview) return null;
 

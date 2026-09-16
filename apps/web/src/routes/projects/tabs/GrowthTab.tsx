@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
+import { useToast } from "../../../lib/ToastContext";
 import type { GrowthItem, Recommendation } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 const TREND_VARIANT = {
   improving: "success",
@@ -18,8 +20,35 @@ const TREND_LABEL = {
   requires_attention: "Requires attention",
 } as const;
 
+function RecommendationSkeleton() {
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between gap-4 pt-[18px]">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-7 w-16 shrink-0" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConceptCardSkeleton() {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-20" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-2 w-full rounded-full" />
+        <Skeleton className="mt-2 h-3 w-1/3" />
+      </CardContent>
+    </Card>
+  );
+}
+
 export function GrowthTab() {
   const project = useProjectContext();
+  const { toast } = useToast();
   const [growth, setGrowth] = useState<GrowthItem[] | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +68,11 @@ export function GrowthTab() {
     setRecommendations((prev) => prev?.filter((r) => r.id !== id) ?? null);
     try {
       await apiClient.post(`/projects/${project.id}/recommendations/${id}/dismiss`);
+      toast({ variant: "success", title: "Recommendation dismissed" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to dismiss recommendation");
+      const message = err instanceof Error ? err.message : "Failed to dismiss recommendation";
+      setError(message);
+      toast({ variant: "error", title: "Couldn't dismiss recommendation", description: message });
     }
   }
 
@@ -51,7 +83,10 @@ export function GrowthTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Recommendations</h2>
         {recommendations === null ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="flex flex-col gap-2">
+            <RecommendationSkeleton />
+            <RecommendationSkeleton />
+          </div>
         ) : recommendations.length === 0 ? (
           <p className="text-[13.5px] text-muted-foreground">
             No active recommendations yet — complete a quiz to generate one.
@@ -75,7 +110,10 @@ export function GrowthTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Mastery by Concept</h2>
         {growth === null ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ConceptCardSkeleton />
+            <ConceptCardSkeleton />
+          </div>
         ) : growth.length === 0 ? (
           <p className="text-[13.5px] text-muted-foreground">
             No mastery data yet — take a quiz to start tracking growth.

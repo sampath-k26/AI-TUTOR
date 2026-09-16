@@ -1,15 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
+import { useToast } from "../../../lib/ToastContext";
+import { useSidebarRefresh } from "../../../lib/SidebarRefreshContext";
 import type { Material } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 const POLL_INTERVAL_MS = 4000;
 
+function MaterialCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-2 pt-[18px]">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-4 w-16" />
+      </CardContent>
+    </Card>
+  );
+}
+
 export function MaterialsTab() {
   const project = useProjectContext();
+  const { toast } = useToast();
+  const { refreshSidebar } = useSidebarRefresh();
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +59,12 @@ export function MaterialsTab() {
       const res = await apiClient.postForm<{ material: Material }>(`/projects/${project.id}/materials`, formData);
       setMaterials((prev) => [res.material, ...(prev ?? [])]);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      toast({ variant: "success", title: "Material uploaded", description: `"${res.material.originalFilename}" is processing.` });
+      refreshSidebar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
+      toast({ variant: "error", title: "Upload failed", description: message });
     } finally {
       setUploading(false);
     }
@@ -66,7 +86,10 @@ export function MaterialsTab() {
       {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
 
       {materials === null ? (
-        <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+        <div className="flex flex-col gap-2">
+          <MaterialCardSkeleton />
+          <MaterialCardSkeleton />
+        </div>
       ) : materials.length === 0 ? (
         <p className="text-[13.5px] text-muted-foreground">No materials yet — upload a PDF to get started.</p>
       ) : (

@@ -3,6 +3,8 @@ import { apiClient } from "../../../lib/apiClient";
 import type { AdminProject, AdminSpace } from "../../../lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
+import { Skeleton } from "../../../components/ui/skeleton";
+import { TableSkeleton } from "../../../components/ui/table-skeleton";
 
 export function SpacesProjectsTab() {
   const [spaces, setSpaces] = useState<AdminSpace[] | null>(null);
@@ -18,7 +20,10 @@ export function SpacesProjectsTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Spaces</h2>
         {!spaces ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
         ) : spaces.length === 0 ? (
           <p className="text-[13.5px] text-muted-foreground">No Spaces yet.</p>
         ) : (
@@ -43,7 +48,11 @@ export function SpacesProjectsTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Projects</h2>
         {!projects ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <Card>
+            <CardContent className="p-0">
+              <TableSkeleton cols={5} />
+            </CardContent>
+          </Card>
         ) : projects.length === 0 ? (
           <p className="text-[13.5px] text-muted-foreground">No Projects yet.</p>
         ) : (

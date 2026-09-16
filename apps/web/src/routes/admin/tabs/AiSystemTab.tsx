@@ -3,6 +3,7 @@ import { apiClient } from "../../../lib/apiClient";
 import type { AdminAiEvaluation, AdminAiUsage, AdminBackgroundJobs, AdminSystemHealth } from "../../../lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -10,6 +11,17 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       <CardContent className="pt-[18px]">
         <p className="text-[13px] text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="pt-[18px]">
+        <Skeleton className="h-3.5 w-20" />
+        <Skeleton className="mt-2 h-7 w-12" />
       </CardContent>
     </Card>
   );
@@ -35,7 +47,11 @@ export function AiSystemTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">System Health</h2>
         {!systemHealth ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card>
@@ -63,7 +79,11 @@ export function AiSystemTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">AI Usage</h2>
         {!aiUsage ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -105,7 +125,7 @@ export function AiSystemTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">AI Evaluation</h2>
         {!aiEvaluation ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <Skeleton className="h-20 w-full" />
         ) : aiEvaluation.bySuite.length === 0 ? (
           <p className="text-[13.5px] text-muted-foreground">No evaluation runs yet.</p>
         ) : (
@@ -133,7 +153,7 @@ export function AiSystemTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Background Processing</h2>
         {!backgroundJobs ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <Skeleton className="h-24 w-full" />
         ) : (
           <>
             <Card>

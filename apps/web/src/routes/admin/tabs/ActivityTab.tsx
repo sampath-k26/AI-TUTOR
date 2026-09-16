@@ -5,6 +5,7 @@ import { Card, CardContent } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Button } from "../../../components/ui/button";
+import { TableSkeleton } from "../../../components/ui/table-skeleton";
 
 export function ActivityTab() {
   const [activity, setActivity] = useState<AdminActivityEvent[] | null>(null);
@@ -52,7 +53,11 @@ export function ActivityTab() {
       </form>
 
       {!activity ? (
-        <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+        <Card>
+          <CardContent className="p-0">
+            <TableSkeleton cols={3} />
+          </CardContent>
+        </Card>
       ) : activity.length === 0 ? (
         <p className="text-[13.5px] text-muted-foreground">No activity matches these filters.</p>
       ) : (

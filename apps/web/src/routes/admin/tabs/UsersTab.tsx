@@ -3,6 +3,8 @@ import { apiClient } from "../../../lib/apiClient";
 import type { AdminUser } from "../../../lib/types";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
+import { Skeleton } from "../../../components/ui/skeleton";
+import { TableSkeleton } from "../../../components/ui/table-skeleton";
 
 export function UsersTab() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -15,7 +17,18 @@ export function UsersTab() {
     });
   }, []);
 
-  if (!users) return <p className="text-[13.5px] text-muted-foreground">Loading…</p>;
+  if (!users) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-4 w-24" />
+        <Card>
+          <CardContent className="p-0">
+            <TableSkeleton cols={3} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">

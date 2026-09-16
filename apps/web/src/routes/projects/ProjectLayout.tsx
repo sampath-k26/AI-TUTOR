@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useOutletContext, useParams } from "react-router
 import { apiClient } from "../../lib/apiClient";
 import type { Project } from "../../lib/types";
 import { cn } from "../../lib/utils";
+import { Skeleton } from "../../components/ui/skeleton";
 
 export function useProjectContext() {
   return useOutletContext<Project>();
@@ -30,7 +31,23 @@ export function ProjectLayout() {
   }, [projectId]);
 
   if (notFound) return <p className="text-[13.5px] text-muted-foreground">Project not found.</p>;
-  if (!project) return <p className="text-[13.5px] text-muted-foreground">Loading…</p>;
+  if (!project) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <Skeleton className="h-3.5 w-24" />
+          <Skeleton className="mt-3 h-7 w-1/3" />
+          <Skeleton className="mt-2 h-4 w-2/3" />
+          <Skeleton className="mt-2 h-4 w-1/2" />
+        </div>
+        <div className="flex gap-5 border-b border-border pb-2">
+          {TABS.map((tab) => (
+            <Skeleton key={tab.to} className="h-4 w-16" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

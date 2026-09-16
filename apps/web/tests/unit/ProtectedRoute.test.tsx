@@ -38,7 +38,7 @@ describe("ProtectedRoute", () => {
   it("shows a loading state while the session is still being determined", () => {
     useSessionMock.mockReturnValue({ session: null, loading: true });
     renderAt("/");
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
     expect(apiClientMock.get).not.toHaveBeenCalled();
   });
 

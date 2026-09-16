@@ -3,6 +3,7 @@ import { apiClient } from "../../../lib/apiClient";
 import type { ProjectAnalytics } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -10,6 +11,17 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       <CardContent className="pt-[18px]">
         <p className="text-[13px] text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="pt-[18px]">
+        <Skeleton className="h-3.5 w-20" />
+        <Skeleton className="mt-2 h-7 w-12" />
       </CardContent>
     </Card>
   );
@@ -28,7 +40,22 @@ export function AnalyticsTab() {
   }, [project.id]);
 
   if (error) return <p role="alert" className="text-[13px] text-destructive">{error}</p>;
-  if (!analytics) return <p className="text-[13.5px] text-muted-foreground">Loading…</p>;
+  if (!analytics) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const { assessmentStats, masterySummary, aiUsage, eventCounts } = analytics;
 

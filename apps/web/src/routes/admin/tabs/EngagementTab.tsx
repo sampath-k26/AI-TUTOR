@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
 import type { AdminEngagement, AdminLearningAnalytics } from "../../../lib/types";
 import { Card, CardContent } from "../../../components/ui/card";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -9,6 +10,17 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       <CardContent className="pt-[18px]">
         <p className="text-[13px] text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="pt-[18px]">
+        <Skeleton className="h-3.5 w-20" />
+        <Skeleton className="mt-2 h-7 w-12" />
       </CardContent>
     </Card>
   );
@@ -28,7 +40,11 @@ export function EngagementTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Engagement</h2>
         {!engagement ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {Array.from({ length: 6 }, (_, i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard label="Total users" value={engagement.totalUsers} />
@@ -44,7 +60,11 @@ export function EngagementTab() {
       <div>
         <h2 className="mb-3 text-[15px] font-semibold text-foreground">Platform Learning Analytics</h2>
         {!learning ? (
-          <p className="text-[13.5px] text-muted-foreground">Loading…</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {Array.from({ length: 5 }, (_, i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard label="Concepts tracked" value={learning.conceptCount} />

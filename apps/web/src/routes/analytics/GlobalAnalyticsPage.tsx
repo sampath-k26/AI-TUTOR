@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../../lib/apiClient";
 import type { GlobalAnalytics } from "../../lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -9,6 +10,17 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       <CardContent className="pt-[18px]">
         <p className="text-[13px] text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="pt-[18px]">
+        <Skeleton className="h-3.5 w-20" />
+        <Skeleton className="mt-2 h-7 w-12" />
       </CardContent>
     </Card>
   );
@@ -30,7 +42,21 @@ export function GlobalAnalyticsPage() {
       <h1 className="text-2xl font-semibold text-foreground">Global Analytics</h1>
 
       {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
-      {!error && !analytics && <p className="text-[13.5px] text-muted-foreground">Loading…</p>}
+
+      {!error && !analytics && (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+        </>
+      )}
 
       {analytics && (
         <>
@@ -47,27 +73,6 @@ export function GlobalAnalyticsPage() {
               label="Average mastery"
               value={analytics.masterySummary.averageMastery === null ? "—" : `${analytics.masterySummary.averageMastery.toFixed(0)}%`}
             />
-          </div>
-
-          <div>
-            <h2 className="mb-3 text-[15px] font-semibold text-foreground">Activity across all Projects</h2>
-            {analytics.eventCounts.length === 0 ? (
-              <p className="text-[13.5px] text-muted-foreground">No activity recorded yet.</p>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Event counts</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-1.5">
-                  {analytics.eventCounts.map((e) => (
-                    <div key={e.type} className="flex items-center justify-between text-[13.5px]">
-                      <span className="text-muted-foreground">{e.type.replace(/_/g, " ")}</span>
-                      <span className="font-medium text-foreground">{e.count}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
           </div>
         </>
       )}
