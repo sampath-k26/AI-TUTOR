@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../core/db";
 import { concepts, materialChunks, materials, projects } from "../../../db/schema";
 import type { Chunk } from "./processing/chunking";
@@ -62,6 +62,15 @@ export async function insertChunks(materialId: string, projectId: string, chunks
 export async function listConceptNamesForProject(projectId: string): Promise<string[]> {
   const rows = await db.select({ name: concepts.name }).from(concepts).where(eq(concepts.projectId, projectId));
   return rows.map((r) => r.name);
+}
+
+export async function getFilenamesByIds(materialIds: string[]): Promise<Map<string, string>> {
+  if (materialIds.length === 0) return new Map();
+  const rows = await db
+    .select({ id: materials.id, originalFilename: materials.originalFilename })
+    .from(materials)
+    .where(inArray(materials.id, materialIds));
+  return new Map(rows.map((r) => [r.id, r.originalFilename]));
 }
 
 export async function insertConcepts(projectId: string, materialId: string, names: string[]) {

@@ -50,3 +50,12 @@ export async function listAllProjects(ownerId: string) {
 export async function getProjectDashboard(projectId: string, ownerId: string) {
   return repo.getProjectByIdForOwner(projectId, ownerId);
 }
+
+/**
+ * Ownership-check entry point for other modules (ai, materials, assessment, ...) —
+ * they must not query the `projects` table directly (only learning/repository.ts
+ * may, per CLAUDE.md's module-boundary rule); they call this instead.
+ */
+export async function getProjectForOwner(projectId: string, ownerId: string) {
+  return repo.getProjectByIdForOwner(projectId, ownerId);
+}

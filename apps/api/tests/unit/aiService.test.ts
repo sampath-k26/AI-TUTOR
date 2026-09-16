@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const repoMocks = vi.hoisted(() => ({
-  getProjectForOwner: vi.fn(),
   getOrCreateConversation: vi.fn(),
   getRecentMessages: vi.fn(),
   getRelevantLearningContext: vi.fn(),
-  getMaterialFilenames: vi.fn(),
   saveMessage: vi.fn(),
 }));
 
@@ -17,9 +15,19 @@ const aiProviderMocks = vi.hoisted(() => ({
   generateStructured: vi.fn(),
 }));
 
+const learningServiceMocks = vi.hoisted(() => ({
+  getProjectForOwner: vi.fn(),
+}));
+
+const materialsServiceMocks = vi.hoisted(() => ({
+  getFilenamesByIds: vi.fn(),
+}));
+
 vi.mock("../../src/modules/ai/repository", () => repoMocks);
 vi.mock("../../src/modules/ai/retrieval", () => retrievalMocks);
 vi.mock("../../src/aiProvider", () => ({ geminiProvider: aiProviderMocks }));
+vi.mock("../../src/modules/learning/service", () => learningServiceMocks);
+vi.mock("../../src/modules/materials/service", () => materialsServiceMocks);
 
 const { handleTutorMessage } = await import("../../src/modules/ai/service");
 
@@ -28,17 +36,17 @@ const CONVERSATION = { id: "conv-1" };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  repoMocks.getProjectForOwner.mockResolvedValue(PROJECT);
+  learningServiceMocks.getProjectForOwner.mockResolvedValue(PROJECT);
   repoMocks.getOrCreateConversation.mockResolvedValue(CONVERSATION);
   repoMocks.getRecentMessages.mockResolvedValue([]);
   repoMocks.getRelevantLearningContext.mockResolvedValue([]);
-  repoMocks.getMaterialFilenames.mockResolvedValue(new Map([["mat-1", "Machine Learning Notes"]]));
+  materialsServiceMocks.getFilenamesByIds.mockResolvedValue(new Map([["mat-1", "Machine Learning Notes"]]));
   repoMocks.saveMessage.mockResolvedValue(undefined);
 });
 
 describe("handleTutorMessage", () => {
   it("returns undefined when the project isn't found/owned (never leaks existence)", async () => {
-    repoMocks.getProjectForOwner.mockResolvedValue(undefined);
+    learningServiceMocks.getProjectForOwner.mockResolvedValue(undefined);
     const result = await handleTutorMessage("proj-1", "user-1", "What is gradient descent?", undefined);
     expect(result).toBeUndefined();
     expect(aiProviderMocks.generateStructured).not.toHaveBeenCalled();

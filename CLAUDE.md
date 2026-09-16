@@ -80,7 +80,8 @@ Everything else in `apps/api/package.json`/`apps/web/package.json` was verified 
 
 ## Code organization rules (enforced by convention, not framework)
 
-- A module's `repository.ts` is the **only** file allowed to run SQL/Drizzle queries for that module's tables. Other modules call its `service.ts` exports — never import another module's `repository.ts` directly.
+- A module's `repository.ts` is the **only** file allowed to run SQL/Drizzle queries for that module's tables. Other modules call its `service.ts` exports — never import another module's `repository.ts` directly. (Caught and fixed real instances of this in `ai` and `materials` importing `learning`'s repository/`projects` table and `ai` importing `materials`' table directly — grep for `from "\.\./learning/repository"` or similar cross-module repository imports if in doubt.)
+  - Exception: a repository may `JOIN` a foreign table purely as an ownership/authorization filter in its own module's query (e.g. `materials/repository.ts` joining `projects` only to filter by `owner_id`, never selecting project columns as return data). Fetching another module's actual data (a filename, a name, a status) must go through that module's `service.ts`, not a join.
 - `router.ts` files contain HTTP wiring only (parse request, call service, shape response) — no business logic.
 - Every external AI call goes through `aiProvider` (`GeminiProvider`/`GroqProvider`) — never call the Gemini/Groq SDK directly from a module's service. Every call through `aiProvider` must be logged to `ai_usage_log`.
 - Every Project-scoped query is explicitly filtered by the authenticated `user_id`/ownership in the service/repository layer, **and** the corresponding table has a Postgres RLS policy — both layers are required (see D16 in the decisions log), not just one.

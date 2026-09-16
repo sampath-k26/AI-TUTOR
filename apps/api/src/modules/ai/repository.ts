@@ -1,18 +1,9 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "../../core/db";
-import { conversations, learningContext, materials, messages, projects } from "../../../db/schema";
+import { conversations, learningContext, messages } from "../../../db/schema";
 
 const CONVERSATION_HISTORY_LIMIT = 10; // bounded window (PRD §6 — never resend full history)
 const LEARNING_CONTEXT_LIMIT = 8;
-
-export async function getProjectForOwner(projectId: string, ownerId: string) {
-  const [project] = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)))
-    .limit(1);
-  return project;
-}
 
 export async function getOrCreateConversation(projectId: string, conversationId: string | undefined) {
   if (conversationId) {
@@ -45,15 +36,6 @@ export async function getRelevantLearningContext(projectId: string) {
     .where(eq(learningContext.projectId, projectId))
     .orderBy(desc(learningContext.relevanceScore))
     .limit(LEARNING_CONTEXT_LIMIT);
-}
-
-export async function getMaterialFilenames(materialIds: string[]): Promise<Map<string, string>> {
-  if (materialIds.length === 0) return new Map();
-  const rows = await db
-    .select({ id: materials.id, originalFilename: materials.originalFilename })
-    .from(materials)
-    .where(inArray(materials.id, materialIds));
-  return new Map(rows.map((r) => [r.id, r.originalFilename]));
 }
 
 export async function saveMessage(params: {

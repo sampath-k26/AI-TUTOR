@@ -1,4 +1,6 @@
 import { geminiProvider } from "../../aiProvider";
+import { getProjectForOwner } from "../learning/service";
+import { getFilenamesByIds } from "../materials/service";
 import * as repo from "./repository";
 import { retrieveRelevantChunks } from "./retrieval";
 import { tutorResponseSchema, type TutorResponse } from "./schemas";
@@ -25,7 +27,7 @@ export async function handleTutorMessage(
   content: string,
   conversationId: string | undefined,
 ): Promise<TutorReply | undefined> {
-  const project = await repo.getProjectForOwner(projectId, ownerId);
+  const project = await getProjectForOwner(projectId, ownerId);
   if (!project) return undefined;
 
   const conversation = await repo.getOrCreateConversation(projectId, conversationId);
@@ -47,7 +49,7 @@ export async function handleTutorMessage(
     return { conversationId: conversation.id, ...reply };
   }
 
-  const materialNames = await repo.getMaterialFilenames([...new Set(retrievedChunks.map((c) => c.materialId))]);
+  const materialNames = await getFilenamesByIds([...new Set(retrievedChunks.map((c) => c.materialId))]);
 
   const prompt = buildTutorPrompt({
     question: content,
