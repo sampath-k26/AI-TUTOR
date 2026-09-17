@@ -40,7 +40,11 @@ assessmentRouter.post("/projects/:projectId/quizzes/:quizId/next-question", asyn
     return;
   }
 
-  res.status(201).json(result);
+  // The correct answer must never reach the client before it answers — strip it
+  // here, at the HTTP boundary, rather than in the service layer, since internal
+  // callers (e.g. scripts/runEval.ts) legitimately need it to drive automated cases.
+  const { answerKey: _answerKey, ...question } = result.question;
+  res.status(201).json({ question });
 });
 
 assessmentRouter.post("/projects/:projectId/questions/:questionId/answer", async (req, res) => {

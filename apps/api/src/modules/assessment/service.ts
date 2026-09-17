@@ -67,6 +67,7 @@ export async function generateNextQuestion(quizId: string, projectId: string, ow
       answerKey: { correctIndex: generated.correctIndex },
       generatedBy: "groq",
     });
+    if (!question) throw new Error("Question insert returned no row");
     return { question: { ...question, options: generated.options } };
   }
 
@@ -87,6 +88,7 @@ export async function generateNextQuestion(quizId: string, projectId: string, ow
     answerKey: { expectedKeyPoints: generated.expectedKeyPoints },
     generatedBy: "gemini",
   });
+  if (!question) throw new Error("Question insert returned no row");
   return { question };
 }
 

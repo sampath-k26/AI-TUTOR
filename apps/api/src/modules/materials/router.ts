@@ -12,11 +12,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_UPLOAD_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype as (typeof ALLOWED_MIME_TYPES)[number])) {
-      cb(new Error("Only PDF files are supported"));
-      return;
-    }
-    cb(null, true);
+    // Reject (not throw) so a wrong file type reaches the route as a missing
+    // `req.file` — a clean 400 below — instead of an uncaught error that the
+    // global error handler would report as a 500.
+    cb(null, ALLOWED_MIME_TYPES.includes(file.mimetype as (typeof ALLOWED_MIME_TYPES)[number]));
   },
 });
 
@@ -43,7 +42,7 @@ materialsRouter.post("/projects/:projectId/materials", upload.single("file"), as
     return;
   }
   if (!req.file) {
-    res.status(400).json({ error: "A PDF file is required (field name: file)" });
+    res.status(400).json({ error: "A PDF file is required (field name: file, PDF only)" });
     return;
   }
 
