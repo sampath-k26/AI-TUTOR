@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../core/db";
+import { withCache } from "../../core/cache";
 import {
   aiUsageLog,
   evalResult,
@@ -21,6 +22,12 @@ import {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+
+/** TTL for the platform-wide dashboard aggregates below (decision D18). Never
+ * applied to listUsers/listAllSpaces/listAllProjectsAdmin/listActivity (admin
+ * browsing lists expected to reflect a just-taken action immediately) or to
+ * getLastProcessedJobAt/getRecentAiSuccessRate (System Health must stay real-time). */
+const CACHE_TTL_MS = 30_000;
 
 function clampLimit(limit?: number): number {
   if (!limit) return DEFAULT_LIMIT;
@@ -112,29 +119,31 @@ export async function listActivity(filter: ActivityFilter, limit?: number, offse
 }
 
 export async function getEngagementStats() {
-  const now = new Date();
-  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return withCache("admin:engagementStats", CACHE_TTL_MS, async () => {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [[totalUsersRow], [activeDayRow], [activeWeekRow], [activeMonthRow], [totalSpacesRow], [totalProjectsRow]] =
-    await Promise.all([
-      db.select({ count: count() }).from(profiles),
-      db.select({ count: sql<number>`count(distinct ${events.userId})` }).from(events).where(gte(events.createdAt, dayAgo)),
-      db.select({ count: sql<number>`count(distinct ${events.userId})` }).from(events).where(gte(events.createdAt, weekAgo)),
-      db.select({ count: sql<number>`count(distinct ${events.userId})` }).from(events).where(gte(events.createdAt, monthAgo)),
-      db.select({ count: count() }).from(spaces),
-      db.select({ count: count() }).from(projects),
-    ]);
+    const [[totalUsersRow], [activeDayRow], [activeWeekRow], [activeMonthRow], [totalSpacesRow], [totalProjectsRow]] =
+      await Promise.all([
+        db.select({ count: count() }).from(profiles),
+        db.select({ count: sql<number>`count(distinct ${events.userId})` }).from(events).where(gte(events.createdAt, dayAgo)),
+        db.select({ count: sql<number>`count(distinct ${events.userId})` }).from(events).where(gte(events.createdAt, weekAgo)),
+        db.select({ count: sql<number>`count(distinct ${events.userId})` }).from(events).where(gte(events.createdAt, monthAgo)),
+        db.select({ count: count() }).from(spaces),
+        db.select({ count: count() }).from(projects),
+      ]);
 
-  return {
-    totalUsers: Number(totalUsersRow?.count ?? 0),
-    activeUsersLast24h: Number(activeDayRow?.count ?? 0),
-    activeUsersLast7d: Number(activeWeekRow?.count ?? 0),
-    activeUsersLast30d: Number(activeMonthRow?.count ?? 0),
-    totalSpaces: Number(totalSpacesRow?.count ?? 0),
-    totalProjects: Number(totalProjectsRow?.count ?? 0),
-  };
+    return {
+      totalUsers: Number(totalUsersRow?.count ?? 0),
+      activeUsersLast24h: Number(activeDayRow?.count ?? 0),
+      activeUsersLast7d: Number(activeWeekRow?.count ?? 0),
+      activeUsersLast30d: Number(activeMonthRow?.count ?? 0),
+      totalSpaces: Number(totalSpacesRow?.count ?? 0),
+      totalProjects: Number(totalProjectsRow?.count ?? 0),
+    };
+  });
 }
 
 const DEFAULT_HISTORY_DAYS = 30;
@@ -142,129 +151,139 @@ const DEFAULT_HISTORY_DAYS = 30;
 /** Day-bucketed distinct active users, platform-wide (M10) — from events.created_at,
  * no new table. */
 export async function getEngagementHistory(days = DEFAULT_HISTORY_DAYS) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const rows = await db
-    .select({
-      day: sql<string>`date_trunc('day', ${events.createdAt})`,
-      activeUsers: sql<number>`count(distinct ${events.userId})`,
-    })
-    .from(events)
-    .where(gte(events.createdAt, since))
-    .groupBy(sql`date_trunc('day', ${events.createdAt})`)
-    .orderBy(sql`date_trunc('day', ${events.createdAt})`);
+  return withCache(`admin:engagementHistory:${days}`, CACHE_TTL_MS, async () => {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select({
+        day: sql<string>`date_trunc('day', ${events.createdAt})`,
+        activeUsers: sql<number>`count(distinct ${events.userId})`,
+      })
+      .from(events)
+      .where(gte(events.createdAt, since))
+      .groupBy(sql`date_trunc('day', ${events.createdAt})`)
+      .orderBy(sql`date_trunc('day', ${events.createdAt})`);
 
-  return rows.map((r) => ({ date: r.day, activeUsers: Number(r.activeUsers) }));
+    return rows.map((r) => ({ date: r.day, activeUsers: Number(r.activeUsers) }));
+  });
 }
 
 /** Day-bucketed platform-wide AI call volume/cost (M10) — from ai_usage_log,
  * no new table. */
 export async function getPlatformAiUsageHistory(days = DEFAULT_HISTORY_DAYS) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const rows = await db
-    .select({
-      day: sql<string>`date_trunc('day', ${aiUsageLog.createdAt})`,
-      callCount: count(),
-      totalCostUsd: sql<number | null>`sum(${aiUsageLog.estimatedCostUsd})`,
-    })
-    .from(aiUsageLog)
-    .where(gte(aiUsageLog.createdAt, since))
-    .groupBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`)
-    .orderBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`);
+  return withCache(`admin:platformAiUsageHistory:${days}`, CACHE_TTL_MS, async () => {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select({
+        day: sql<string>`date_trunc('day', ${aiUsageLog.createdAt})`,
+        callCount: count(),
+        totalCostUsd: sql<number | null>`sum(${aiUsageLog.estimatedCostUsd})`,
+      })
+      .from(aiUsageLog)
+      .where(gte(aiUsageLog.createdAt, since))
+      .groupBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`)
+      .orderBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`);
 
-  return rows.map((r) => ({ date: r.day, callCount: Number(r.callCount), totalCostUsd: r.totalCostUsd != null ? Number(r.totalCostUsd) : 0 }));
+    return rows.map((r) => ({ date: r.day, callCount: Number(r.callCount), totalCostUsd: r.totalCostUsd != null ? Number(r.totalCostUsd) : 0 }));
+  });
 }
 
 export async function getPlatformLearningAnalytics() {
-  const [[masteryStats], [quizStats], [materialStats]] = await Promise.all([
-    db.select({ conceptCount: count(), avgLevel: sql<number | null>`avg(${mastery.level})` }).from(mastery),
-    db
-      .select({
-        totalQuizzes: count(),
-        completedQuizzes: sql<number>`count(*) filter (where ${quizzes.status} = 'completed')`,
-      })
-      .from(quizzes),
-    db.select({ count: count() }).from(materials),
-  ]);
+  return withCache("admin:platformLearningAnalytics", CACHE_TTL_MS, async () => {
+    const [[masteryStats], [quizStats], [materialStats]] = await Promise.all([
+      db.select({ conceptCount: count(), avgLevel: sql<number | null>`avg(${mastery.level})` }).from(mastery),
+      db
+        .select({
+          totalQuizzes: count(),
+          completedQuizzes: sql<number>`count(*) filter (where ${quizzes.status} = 'completed')`,
+        })
+        .from(quizzes),
+      db.select({ count: count() }).from(materials),
+    ]);
 
-  return {
-    conceptCount: Number(masteryStats?.conceptCount ?? 0),
-    averageMastery: masteryStats?.avgLevel != null ? Number(masteryStats.avgLevel) : null,
-    totalQuizzes: Number(quizStats?.totalQuizzes ?? 0),
-    completedQuizzes: Number(quizStats?.completedQuizzes ?? 0),
-    totalMaterials: Number(materialStats?.count ?? 0),
-  };
+    return {
+      conceptCount: Number(masteryStats?.conceptCount ?? 0),
+      averageMastery: masteryStats?.avgLevel != null ? Number(masteryStats.avgLevel) : null,
+      totalQuizzes: Number(quizStats?.totalQuizzes ?? 0),
+      completedQuizzes: Number(quizStats?.completedQuizzes ?? 0),
+      totalMaterials: Number(materialStats?.count ?? 0),
+    };
+  });
 }
 
 export async function getPlatformAiUsage() {
-  const [overall] = await db
-    .select({
-      callCount: count(),
-      successCount: sql<number>`count(*) filter (where ${aiUsageLog.success} = true)`,
-      totalCostUsd: sql<number | null>`sum(${aiUsageLog.estimatedCostUsd})`,
-      averageLatencyMs: sql<number | null>`avg(${aiUsageLog.latencyMs})`,
-    })
-    .from(aiUsageLog);
+  return withCache("admin:platformAiUsage", CACHE_TTL_MS, async () => {
+    const [overall] = await db
+      .select({
+        callCount: count(),
+        successCount: sql<number>`count(*) filter (where ${aiUsageLog.success} = true)`,
+        totalCostUsd: sql<number | null>`sum(${aiUsageLog.estimatedCostUsd})`,
+        averageLatencyMs: sql<number | null>`avg(${aiUsageLog.latencyMs})`,
+      })
+      .from(aiUsageLog);
 
-  const byProvider = await db
-    .select({
-      provider: aiUsageLog.provider,
-      feature: aiUsageLog.feature,
-      callCount: count(),
-      successCount: sql<number>`count(*) filter (where ${aiUsageLog.success} = true)`,
-    })
-    .from(aiUsageLog)
-    .groupBy(aiUsageLog.provider, aiUsageLog.feature);
+    const byProvider = await db
+      .select({
+        provider: aiUsageLog.provider,
+        feature: aiUsageLog.feature,
+        callCount: count(),
+        successCount: sql<number>`count(*) filter (where ${aiUsageLog.success} = true)`,
+      })
+      .from(aiUsageLog)
+      .groupBy(aiUsageLog.provider, aiUsageLog.feature);
 
-  const recentErrors = await db
-    .select({
-      id: aiUsageLog.id,
-      provider: aiUsageLog.provider,
-      feature: aiUsageLog.feature,
-      errorDetail: aiUsageLog.errorDetail,
-      createdAt: aiUsageLog.createdAt,
-    })
-    .from(aiUsageLog)
-    .where(eq(aiUsageLog.success, false))
-    .orderBy(desc(aiUsageLog.createdAt))
-    .limit(10);
+    const recentErrors = await db
+      .select({
+        id: aiUsageLog.id,
+        provider: aiUsageLog.provider,
+        feature: aiUsageLog.feature,
+        errorDetail: aiUsageLog.errorDetail,
+        createdAt: aiUsageLog.createdAt,
+      })
+      .from(aiUsageLog)
+      .where(eq(aiUsageLog.success, false))
+      .orderBy(desc(aiUsageLog.createdAt))
+      .limit(10);
 
-  return {
-    callCount: Number(overall?.callCount ?? 0),
-    successCount: Number(overall?.successCount ?? 0),
-    totalCostUsd: overall?.totalCostUsd != null ? Number(overall.totalCostUsd) : 0,
-    averageLatencyMs: overall?.averageLatencyMs != null ? Number(overall.averageLatencyMs) : null,
-    byProvider: byProvider.map((r) => ({
-      provider: r.provider,
-      feature: r.feature,
-      callCount: Number(r.callCount),
-      successCount: Number(r.successCount),
-    })),
-    recentErrors,
-  };
+    return {
+      callCount: Number(overall?.callCount ?? 0),
+      successCount: Number(overall?.successCount ?? 0),
+      totalCostUsd: overall?.totalCostUsd != null ? Number(overall.totalCostUsd) : 0,
+      averageLatencyMs: overall?.averageLatencyMs != null ? Number(overall.averageLatencyMs) : null,
+      byProvider: byProvider.map((r) => ({
+        provider: r.provider,
+        feature: r.feature,
+        callCount: Number(r.callCount),
+        successCount: Number(r.successCount),
+      })),
+      recentErrors,
+    };
+  });
 }
 
 export async function getAiEvaluationSummary() {
-  const rows = await db
-    .select({
-      suite: evalResult.suite,
-      verdict: evalResult.verdict,
-      count: count(),
-      avgScore: sql<number | null>`avg(${evalResult.score})`,
-    })
-    .from(evalResult)
-    .groupBy(evalResult.suite, evalResult.verdict);
+  return withCache("admin:aiEvaluationSummary", CACHE_TTL_MS, async () => {
+    const rows = await db
+      .select({
+        suite: evalResult.suite,
+        verdict: evalResult.verdict,
+        count: count(),
+        avgScore: sql<number | null>`avg(${evalResult.score})`,
+      })
+      .from(evalResult)
+      .groupBy(evalResult.suite, evalResult.verdict);
 
-  const latestRun = await db.select({ createdAt: evalResult.createdAt }).from(evalResult).orderBy(desc(evalResult.createdAt)).limit(1);
+    const latestRun = await db.select({ createdAt: evalResult.createdAt }).from(evalResult).orderBy(desc(evalResult.createdAt)).limit(1);
 
-  return {
-    lastRunAt: latestRun[0]?.createdAt ?? null,
-    bySuite: rows.map((r) => ({
-      suite: r.suite,
-      verdict: r.verdict,
-      count: Number(r.count),
-      averageScore: r.avgScore != null ? Number(r.avgScore) : null,
-    })),
-  };
+    return {
+      lastRunAt: latestRun[0]?.createdAt ?? null,
+      bySuite: rows.map((r) => ({
+        suite: r.suite,
+        verdict: r.verdict,
+        count: Number(r.count),
+        averageScore: r.avgScore != null ? Number(r.avgScore) : null,
+      })),
+    };
+  });
 }
 
 interface BackgroundJobStatusRow extends Record<string, unknown> {
@@ -274,28 +293,30 @@ interface BackgroundJobStatusRow extends Record<string, unknown> {
 }
 
 export async function getBackgroundJobStatus() {
-  const { rows } = await db.execute<BackgroundJobStatusRow>(
-    sql`select name, state, count(*) as job_count from pgboss.job group by name, state order by name, state`,
-  );
+  return withCache("admin:backgroundJobStatus", CACHE_TTL_MS, async () => {
+    const { rows } = await db.execute<BackgroundJobStatusRow>(
+      sql`select name, state, count(*) as job_count from pgboss.job group by name, state order by name, state`,
+    );
 
-  const { rows: recentFailedRows } = await db.execute<{
-    id: string;
-    name: string;
-    output: unknown;
-    completed_on: string | null;
-  }>(
-    sql`select id, name, output, completed_on from pgboss.job where state = 'failed' order by completed_on desc nulls last limit 10`,
-  );
+    const { rows: recentFailedRows } = await db.execute<{
+      id: string;
+      name: string;
+      output: unknown;
+      completed_on: string | null;
+    }>(
+      sql`select id, name, output, completed_on from pgboss.job where state = 'failed' order by completed_on desc nulls last limit 10`,
+    );
 
-  return {
-    queueCounts: rows.map((r) => ({ queue: r.name, state: r.state, count: Number(r.job_count) })),
-    recentFailedJobs: recentFailedRows.map((r) => ({
-      id: r.id,
-      queue: r.name,
-      output: r.output,
-      completedOn: r.completed_on,
-    })),
-  };
+    return {
+      queueCounts: rows.map((r) => ({ queue: r.name, state: r.state, count: Number(r.job_count) })),
+      recentFailedJobs: recentFailedRows.map((r) => ({
+        id: r.id,
+        queue: r.name,
+        output: r.output,
+        completedOn: r.completed_on,
+      })),
+    };
+  });
 }
 
 export async function getLastProcessedJobAt(): Promise<Date | null> {

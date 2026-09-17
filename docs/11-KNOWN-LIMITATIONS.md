@@ -24,7 +24,7 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 
 - Single Postgres instance (Supabase) serves both relational data and the pgvector index (decision D5, explicitly accepted at prototype scale) — no dedicated vector store or read replica.
 - pg-boss workers scale by running more worker processes against the same database; there's no documented autoscaling strategy.
-- No caching layer for repeated retrieval or analytics queries — an explicit M8+ item.
+- The in-process cache (M11, decision D18) is per-process and cold after every deploy/restart — no shared cache across multiple horizontally-scaled instances, and it is TTL-only with no write-path invalidation (bounded ≤30s staleness on dashboard aggregates is an accepted tradeoff, not a bug). Retrieval itself (pgvector similarity search) is not cached — a deliberate exclusion, since Tutor/quiz-generation grounding must stay real-time.
 
 ## Security
 
@@ -50,4 +50,4 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 
 ## Future improvements
 
-Tracked as M8-M13 in `06-IMPLEMENTATION-PLAN.md`. Done: rich document understanding (M8), streaming Tutor responses (M9), and improved analytics (M10 — day-bucketed mastery/AI-usage/engagement time-series charts, hand-rolled zero-dependency SVG per the dataviz skill's validated palette). Remaining: an in-process caching layer for repeated retrieval/analytics queries (M11), concept maps (M12), learning plans (M13).
+Tracked as M8-M13 in `06-IMPLEMENTATION-PLAN.md`. Done: rich document understanding (M8), streaming Tutor responses (M9), improved analytics (M10 — day-bucketed mastery/AI-usage/engagement time-series charts, hand-rolled zero-dependency SVG per the dataviz skill's validated palette), and an in-process caching layer for analytics/admin dashboard aggregates (M11, decision D18). Remaining: concept maps (M12), learning plans (M13).
