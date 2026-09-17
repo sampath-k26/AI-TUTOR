@@ -76,6 +76,27 @@ export async function getQuestionForProject(questionId: string, projectId: strin
   return row?.question;
 }
 
+/** A question is answered at most once (responses.question_id is unique) — this
+ * is the idempotent-resubmission check submitAnswer runs before grading. */
+export async function getResponseForQuestion(questionId: string) {
+  const [response] = await db.select().from(responses).where(eq(responses.questionId, questionId)).limit(1);
+  return response;
+}
+
+const UNIQUE_VIOLATION = "23505";
+
+/** Drizzle wraps the raw driver error in its own error object with the
+ * original on `.cause` — found live when a real concurrent race only tripped
+ * this on one request in five; the other four never reached this catch at
+ * all (caught earlier by submitAnswer's existence check), so the bug only
+ * showed up on the one genuine last-instant collision. */
+function isUniqueViolation(err: unknown): boolean {
+  const code = (err as { code?: unknown })?.code;
+  if (code === UNIQUE_VIOLATION) return true;
+  const causeCode = (err as { cause?: { code?: unknown } })?.cause?.code;
+  return causeCode === UNIQUE_VIOLATION;
+}
+
 export async function createResponse(params: {
   questionId: string;
   userAnswer: string;
@@ -83,17 +104,29 @@ export async function createResponse(params: {
   evaluation?: unknown;
   score: number;
 }) {
-  const [response] = await db
-    .insert(responses)
-    .values({
-      questionId: params.questionId,
-      userAnswer: params.userAnswer,
-      isCorrect: params.isCorrect,
-      evaluation: params.evaluation,
-      score: params.score.toString(),
-    })
-    .returning();
-  return response;
+  try {
+    const [response] = await db
+      .insert(responses)
+      .values({
+        questionId: params.questionId,
+        userAnswer: params.userAnswer,
+        isCorrect: params.isCorrect,
+        evaluation: params.evaluation,
+        score: params.score.toString(),
+      })
+      .returning();
+    return { response, wasAlreadyAnswered: false as const };
+  } catch (err) {
+    // Lost a race against a concurrent identical submission (both passed
+    // submitAnswer's earlier existence check before either had inserted) — the
+    // unique index caught what the check couldn't. Return the winner's row
+    // instead of erroring, so a double-click/retry sees its real prior answer.
+    if (isUniqueViolation(err)) {
+      const existing = await getResponseForQuestion(params.questionId);
+      if (existing) return { response: existing, wasAlreadyAnswered: true as const };
+    }
+    throw err;
+  }
 }
 
 export async function getMasteryState(projectId: string, conceptId: string) {
@@ -146,6 +179,18 @@ export async function insertGrowthSnapshot(params: {
     trend: params.trend,
     evidenceRef: params.evidenceRef,
   });
+}
+
+/** Newest snapshot for one concept — used to re-report an idempotent resubmission's
+ * current trend without recomputing it. */
+export async function getLatestGrowthForConcept(projectId: string, conceptId: string) {
+  const [row] = await db
+    .select()
+    .from(growthSnapshots)
+    .where(and(eq(growthSnapshots.projectId, projectId), eq(growthSnapshots.conceptId, conceptId)))
+    .orderBy(desc(growthSnapshots.createdAt))
+    .limit(1);
+  return row;
 }
 
 /** Latest snapshot per concept, newest first — fetched in bulk and reduced in JS rather than a DB-specific DISTINCT ON. */

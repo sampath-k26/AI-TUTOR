@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import multer from "multer";
 import { config } from "./core/config";
 import { learningRouter } from "./modules/learning/router";
 import { materialsRouter } from "./modules/materials/router";
@@ -43,6 +44,23 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.end();
     return;
   }
+
+  // Found live during a security pass: an oversized JSON body, malformed JSON, and
+  // an oversized file upload all reached here and were reported as a 500, even
+  // though body-parser/multer already know these are client mistakes. body-parser
+  // attaches the correct HTTP status to its own errors (413 too-large, 400 parse
+  // failure) — surface that instead of collapsing every non-4xx-handled error to 500.
+  const status = (err as { status?: unknown; statusCode?: unknown } | null)?.status ?? (err as { statusCode?: unknown } | null)?.statusCode;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    res.status(status).json({ error: err instanceof Error ? err.message : "Bad request" });
+    return;
+  }
+
+  if (err instanceof multer.MulterError) {
+    res.status(413).json({ error: err.message });
+    return;
+  }
+
   res.status(500).json({ error: "Internal server error" });
 };
 app.use(errorHandler);

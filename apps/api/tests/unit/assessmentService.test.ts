@@ -8,10 +8,12 @@ const repoMocks = vi.hoisted(() => ({
   getRecentlyAskedConceptIds: vi.fn(),
   createQuestion: vi.fn(),
   getQuestionForProject: vi.fn(),
+  getResponseForQuestion: vi.fn(),
   createResponse: vi.fn(),
   getMasteryState: vi.fn(),
   upsertMastery: vi.fn(),
   insertGrowthSnapshot: vi.fn(),
+  getLatestGrowthForConcept: vi.fn(),
 }));
 
 const learningServiceMocks = vi.hoisted(() => ({
@@ -45,6 +47,7 @@ beforeEach(() => {
   learningServiceMocks.getProjectForOwner.mockResolvedValue(PROJECT);
   materialsServiceMocks.searchRelevantChunks.mockResolvedValue([{ content: "gradient descent minimizes loss" }]);
   materialsServiceMocks.getConceptById.mockResolvedValue({ id: "concept-1", name: "Gradient Descent", projectId: "proj-1" });
+  repoMocks.getResponseForQuestion.mockResolvedValue(undefined); // no prior answer, unless a test says otherwise
 });
 
 describe("startQuiz", () => {
@@ -110,7 +113,7 @@ describe("submitAnswer", () => {
       difficulty: 3,
       answerKey: { correctIndex: 2 },
     });
-    repoMocks.createResponse.mockResolvedValue({ id: "resp-1" });
+    repoMocks.createResponse.mockResolvedValue({ response: { id: "resp-1" }, wasAlreadyAnswered: false });
     repoMocks.getMasteryState.mockResolvedValue(undefined);
 
     const result = await service.submitAnswer("q-1", "proj-1", "user-1", "2");
@@ -128,7 +131,7 @@ describe("submitAnswer", () => {
       prompt: "Explain gradient descent.",
       answerKey: { expectedKeyPoints: ["iterative", "minimizes loss"] },
     });
-    repoMocks.createResponse.mockResolvedValue({ id: "resp-2" });
+    repoMocks.createResponse.mockResolvedValue({ response: { id: "resp-2" }, wasAlreadyAnswered: false });
     repoMocks.getMasteryState.mockResolvedValue(undefined);
     geminiMock.generateStructured.mockResolvedValue({
       understanding: "partial",
@@ -154,7 +157,7 @@ describe("submitAnswer", () => {
       difficulty: 5,
       answerKey: { correctIndex: 0 },
     });
-    repoMocks.createResponse.mockResolvedValue({ id: "resp-1" });
+    repoMocks.createResponse.mockResolvedValue({ response: { id: "resp-1" }, wasAlreadyAnswered: false });
     repoMocks.getMasteryState.mockResolvedValue({ level: "10", evidenceCount: 1, lastEvidenceAt: new Date() });
 
     const result = await service.submitAnswer("q-1", "proj-1", "user-1", "0");
@@ -171,11 +174,62 @@ describe("submitAnswer", () => {
       difficulty: 3,
       answerKey: { correctIndex: 0 },
     });
-    repoMocks.createResponse.mockResolvedValue({ id: "resp-1" });
+    repoMocks.createResponse.mockResolvedValue({ response: { id: "resp-1" }, wasAlreadyAnswered: false });
     repoMocks.getMasteryState.mockResolvedValue({ level: "80", evidenceCount: 10, lastEvidenceAt: new Date() });
 
     const result = await service.submitAnswer("q-1", "proj-1", "user-1", "1"); // wrong answer
 
     expect(result?.trend).toBe("requires_attention");
+  });
+
+  it("returns the existing response instead of re-grading a question that was already answered", async () => {
+    repoMocks.getQuestionForProject.mockResolvedValue({
+      id: "q-1",
+      conceptId: "concept-1",
+      type: "open_ended",
+      difficulty: 3,
+      prompt: "Explain gradient descent.",
+      answerKey: { expectedKeyPoints: ["iterative"] },
+    });
+    repoMocks.getResponseForQuestion.mockResolvedValue({
+      id: "resp-1",
+      questionId: "q-1",
+      evaluation: { understanding: "strong", feedbackText: "Nice work." },
+    });
+    repoMocks.getMasteryState.mockResolvedValue({ level: "55", evidenceCount: 2, lastEvidenceAt: new Date() });
+    repoMocks.getLatestGrowthForConcept.mockResolvedValue({ trend: "improving" });
+
+    const result = await service.submitAnswer("q-1", "proj-1", "user-1", "a second, different answer");
+
+    expect(geminiMock.generateStructured).not.toHaveBeenCalled();
+    expect(repoMocks.createResponse).not.toHaveBeenCalled();
+    expect(repoMocks.upsertMastery).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      response: { id: "resp-1", questionId: "q-1", evaluation: { understanding: "strong", feedbackText: "Nice work." } },
+      evaluation: { understanding: "strong", feedbackText: "Nice work." },
+      masteryLevel: 55,
+      trend: "improving",
+    });
+  });
+
+  it("returns the race-losing insert's existing response rather than throwing on a unique-constraint conflict", async () => {
+    repoMocks.getQuestionForProject.mockResolvedValue({
+      id: "q-1",
+      conceptId: "concept-1",
+      type: "mcq",
+      difficulty: 2,
+      answerKey: { correctIndex: 0 },
+    });
+    repoMocks.createResponse.mockResolvedValue({
+      response: { id: "resp-winner", questionId: "q-1", evaluation: { isCorrect: true } },
+      wasAlreadyAnswered: true,
+    });
+    repoMocks.getMasteryState.mockResolvedValue({ level: "40", evidenceCount: 1, lastEvidenceAt: new Date() });
+    repoMocks.getLatestGrowthForConcept.mockResolvedValue({ trend: "stable" });
+
+    const result = await service.submitAnswer("q-1", "proj-1", "user-1", "0");
+
+    expect(repoMocks.upsertMastery).not.toHaveBeenCalled();
+    expect(result?.response).toEqual({ id: "resp-winner", questionId: "q-1", evaluation: { isCorrect: true } });
   });
 });

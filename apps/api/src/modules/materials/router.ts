@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { requireAuth } from "../../core/auth";
 import * as service from "./service";
-import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, materialIdParamSchema, projectIdParamSchema } from "./schemas";
+import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, hasPdfMagicBytes, materialIdParamSchema, projectIdParamSchema } from "./schemas";
 
 export const materialsRouter = Router();
 
@@ -43,6 +43,12 @@ materialsRouter.post("/projects/:projectId/materials", upload.single("file"), as
   }
   if (!req.file) {
     res.status(400).json({ error: "A PDF file is required (field name: file, PDF only)" });
+    return;
+  }
+  // The fileFilter above only checked the client-declared Content-Type, which any
+  // caller can lie about — this checks the actual bytes.
+  if (!hasPdfMagicBytes(req.file.buffer)) {
+    res.status(400).json({ error: "The uploaded file is not a valid PDF" });
     return;
   }
 

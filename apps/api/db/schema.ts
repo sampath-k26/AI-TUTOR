@@ -276,7 +276,11 @@ export const responses = pgTable(
     score: numeric("score", { precision: 3, scale: 2 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("responses_question_id_idx").on(table.questionId)],
+  // A question is answered exactly once — enforced here (not just in application
+  // logic) after a live security/load test found concurrent identical submissions
+  // each independently graded and each applied their own mastery update, since
+  // nothing serialized "has this question already been answered?".
+  (table) => [uniqueIndex("responses_question_id_uq").on(table.questionId)],
 );
 
 export const recommendations = pgTable(

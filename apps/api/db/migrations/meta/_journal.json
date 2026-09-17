@@ -29,6 +29,13 @@
       "when": 1789643714194,
       "tag": "0004_add_learning_plan_ai_feature",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789658277116,
+      "tag": "0004_slimy_celestials",
+      "breakpoints": true
     }
   ]
 }
