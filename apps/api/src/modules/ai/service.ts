@@ -235,7 +235,14 @@ async function* streamTutorAnswer(prepared: PreparedTutorTurn, projectId: string
         }
       }
     }
-  } catch {
+  } catch (err) {
+    // Streaming routes can't rely on main.ts's global error handler (headers are
+    // already sent), so this was the only place this could ever be logged — found
+    // live as a real gap while debugging a genuine mid-stream failure that left no
+    // console trace at all (a Gemini-side failure still lands in ai_usage_log via
+    // generateTextStream's own logging; this also catches a bug in the loop above
+    // itself, which wouldn't).
+    console.error("Tutor stream interrupted", err);
     yield { type: "error", message: "The Tutor's response was interrupted." };
     return;
   }
