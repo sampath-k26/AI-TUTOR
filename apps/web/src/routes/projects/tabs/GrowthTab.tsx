@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
 import { useToast } from "../../../lib/ToastContext";
-import type { GrowthItem, Recommendation } from "../../../lib/types";
+import type { GrowthItem, MasteryHistoryPoint, Recommendation } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Skeleton } from "../../../components/ui/skeleton";
+import { LineChart, type LineChartSeries } from "../../../components/charts/LineChart";
 
 const TREND_VARIANT = {
   improving: "success",
@@ -51,6 +52,7 @@ export function GrowthTab() {
   const { toast } = useToast();
   const [growth, setGrowth] = useState<GrowthItem[] | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
+  const [masteryHistory, setMasteryHistory] = useState<MasteryHistoryPoint[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,6 +64,10 @@ export function GrowthTab() {
       .get<{ recommendations: Recommendation[] }>(`/projects/${project.id}/recommendations`)
       .then((res) => setRecommendations(res.recommendations))
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load recommendations"));
+    apiClient
+      .get<{ history: MasteryHistoryPoint[] }>(`/projects/${project.id}/analytics/mastery-history`)
+      .then((res) => setMasteryHistory(res.history))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load mastery history"));
   }, [project.id]);
 
   async function handleDismiss(id: string) {
@@ -137,6 +143,32 @@ export function GrowthTab() {
           </div>
         )}
       </div>
+
+      <div>
+        <h2 className="mb-3 text-[15px] font-semibold text-foreground">Mastery Over Time</h2>
+        {masteryHistory === null ? (
+          <Skeleton className="h-[200px] w-full rounded-md" />
+        ) : (
+          <LineChart
+            series={masteryHistoryToSeries(masteryHistory)}
+            yFormat={(v) => `${v.toFixed(0)}%`}
+            emptyMessage="No mastery history yet — take a quiz to start tracking growth over time."
+          />
+        )}
+      </div>
     </div>
   );
+}
+
+function masteryHistoryToSeries(history: MasteryHistoryPoint[]): LineChartSeries[] {
+  const byConceptId = new Map<string, LineChartSeries>();
+  for (const point of history) {
+    let series = byConceptId.get(point.conceptId);
+    if (!series) {
+      series = { id: point.conceptId, label: point.conceptName, points: [] };
+      byConceptId.set(point.conceptId, series);
+    }
+    series.points.push({ x: point.date, y: point.level });
+  }
+  return [...byConceptId.values()];
 }

@@ -52,6 +52,20 @@
     --border-strong: 225 11% 86%;
     --input: 228 12% 92%;
     --ring: 234 56% 60%;
+
+    /* Chart categorical palette (M10) — plain hex, not part of the HSL semantic
+       system above: these are the dataviz skill's own pre-validated (CVD-safe,
+       adjacent-pair) series colors, kept separate from --success/--warning/
+       --destructive so a chart series never impersonates a status color.
+       Grid/axis ink reuses --border/--border-strong directly (same values). */
+    --chart-series-1: #2a78d6;
+    --chart-series-2: #eb6834;
+    --chart-series-3: #1baf7a;
+    --chart-series-4: #eda100;
+    --chart-series-5: #e87ba4;
+    --chart-series-6: #008300;
+    --chart-series-7: #4a3aa7;
+    --chart-series-8: #e34948;
   }
 
   .dark {
@@ -95,6 +109,15 @@
     --border-strong: 218 8% 22%;
     --input: 223 9% 15%;
     --ring: 234 56% 60%;
+
+    --chart-series-1: #3987e5;
+    --chart-series-2: #d95926;
+    --chart-series-3: #199e70;
+    --chart-series-4: #c98500;
+    --chart-series-5: #d55181;
+    --chart-series-6: #008300;
+    --chart-series-7: #9085e9;
+    --chart-series-8: #e66767;
   }
 
   * {

@@ -137,6 +137,43 @@ export async function getEngagementStats() {
   };
 }
 
+const DEFAULT_HISTORY_DAYS = 30;
+
+/** Day-bucketed distinct active users, platform-wide (M10) — from events.created_at,
+ * no new table. */
+export async function getEngagementHistory(days = DEFAULT_HISTORY_DAYS) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      day: sql<string>`date_trunc('day', ${events.createdAt})`,
+      activeUsers: sql<number>`count(distinct ${events.userId})`,
+    })
+    .from(events)
+    .where(gte(events.createdAt, since))
+    .groupBy(sql`date_trunc('day', ${events.createdAt})`)
+    .orderBy(sql`date_trunc('day', ${events.createdAt})`);
+
+  return rows.map((r) => ({ date: r.day, activeUsers: Number(r.activeUsers) }));
+}
+
+/** Day-bucketed platform-wide AI call volume/cost (M10) — from ai_usage_log,
+ * no new table. */
+export async function getPlatformAiUsageHistory(days = DEFAULT_HISTORY_DAYS) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      day: sql<string>`date_trunc('day', ${aiUsageLog.createdAt})`,
+      callCount: count(),
+      totalCostUsd: sql<number | null>`sum(${aiUsageLog.estimatedCostUsd})`,
+    })
+    .from(aiUsageLog)
+    .where(gte(aiUsageLog.createdAt, since))
+    .groupBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`)
+    .orderBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`);
+
+  return rows.map((r) => ({ date: r.day, callCount: Number(r.callCount), totalCostUsd: r.totalCostUsd != null ? Number(r.totalCostUsd) : 0 }));
+}
+
 export async function getPlatformLearningAnalytics() {
   const [[masteryStats], [quizStats], [materialStats]] = await Promise.all([
     db.select({ conceptCount: count(), avgLevel: sql<number | null>`avg(${mastery.level})` }).from(mastery),

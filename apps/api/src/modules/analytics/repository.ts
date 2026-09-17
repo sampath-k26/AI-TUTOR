@@ -92,6 +92,42 @@ export async function getProjectMasterySummary(projectId: string) {
   };
 }
 
+/** Day-bucketed mastery-over-time per concept (M10) — from data that already
+ * exists (growth_snapshots), no new table. */
+export async function getProjectMasteryHistory(projectId: string) {
+  const rows = await db
+    .select({
+      conceptId: growthSnapshots.conceptId,
+      conceptName: concepts.name,
+      day: sql<string>`date_trunc('day', ${growthSnapshots.createdAt})`,
+      avgLevel: sql<number>`avg(${growthSnapshots.level})`,
+    })
+    .from(growthSnapshots)
+    .innerJoin(concepts, eq(growthSnapshots.conceptId, concepts.id))
+    .where(eq(growthSnapshots.projectId, projectId))
+    .groupBy(growthSnapshots.conceptId, concepts.name, sql`date_trunc('day', ${growthSnapshots.createdAt})`)
+    .orderBy(sql`date_trunc('day', ${growthSnapshots.createdAt})`);
+
+  return rows.map((r) => ({ conceptId: r.conceptId, conceptName: r.conceptName, date: r.day, level: Number(r.avgLevel) }));
+}
+
+/** Day-bucketed AI call volume/cost for this project (M10) — from ai_usage_log,
+ * no new table. */
+export async function getProjectAiUsageHistory(projectId: string) {
+  const rows = await db
+    .select({
+      day: sql<string>`date_trunc('day', ${aiUsageLog.createdAt})`,
+      callCount: count(),
+      totalCostUsd: sql<number | null>`sum(${aiUsageLog.estimatedCostUsd})`,
+    })
+    .from(aiUsageLog)
+    .where(sql`${aiUsageLog.relatedEntity} ->> 'projectId' = ${projectId}`)
+    .groupBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`)
+    .orderBy(sql`date_trunc('day', ${aiUsageLog.createdAt})`);
+
+  return rows.map((r) => ({ date: r.day, callCount: Number(r.callCount), totalCostUsd: r.totalCostUsd != null ? Number(r.totalCostUsd) : 0 }));
+}
+
 export async function getProjectAiUsageSummary(projectId: string) {
   const [stats] = await db
     .select({

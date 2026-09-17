@@ -57,6 +57,16 @@ adminRouter.get("/admin/engagement", async (_req, res) => {
   res.json({ engagement });
 });
 
+adminRouter.get("/admin/engagement-history", async (_req, res) => {
+  const history = await service.getEngagementHistory();
+  res.json({ history });
+});
+
+adminRouter.get("/admin/ai-usage-history", async (_req, res) => {
+  const history = await service.getPlatformAiUsageHistory();
+  res.json({ history });
+});
+
 adminRouter.get("/admin/learning-analytics", async (_req, res) => {
   const learningAnalytics = await service.getLearningAnalytics();
   res.json({ learningAnalytics });

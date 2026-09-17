@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
-import type { ProjectAnalytics } from "../../../lib/types";
+import type { AiUsageHistoryPoint, ProjectAnalytics } from "../../../lib/types";
 import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Skeleton } from "../../../components/ui/skeleton";
+import { LineChart } from "../../../components/charts/LineChart";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -30,6 +31,7 @@ function StatCardSkeleton() {
 export function AnalyticsTab() {
   const project = useProjectContext();
   const [analytics, setAnalytics] = useState<ProjectAnalytics | null>(null);
+  const [aiUsageHistory, setAiUsageHistory] = useState<AiUsageHistoryPoint[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,6 +39,10 @@ export function AnalyticsTab() {
       .get<{ analytics: ProjectAnalytics }>(`/projects/${project.id}/analytics`)
       .then((res) => setAnalytics(res.analytics))
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load analytics"));
+    apiClient
+      .get<{ history: AiUsageHistoryPoint[] }>(`/projects/${project.id}/analytics/ai-usage-history`)
+      .then((res) => setAiUsageHistory(res.history))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load AI usage history"));
   }, [project.id]);
 
   if (error) return <p role="alert" className="text-[13px] text-destructive">{error}</p>;
@@ -97,6 +103,16 @@ export function AnalyticsTab() {
             value={aiUsage.averageLatencyMs === null ? "—" : `${aiUsage.averageLatencyMs.toFixed(0)}ms`}
           />
           <StatCard label="Est. cost" value={`$${aiUsage.totalCostUsd.toFixed(4)}`} />
+        </div>
+        <div className="mt-3">
+          {aiUsageHistory === null ? (
+            <Skeleton className="h-[200px] w-full rounded-md" />
+          ) : (
+            <LineChart
+              series={[{ id: "calls", label: "AI calls per day", points: aiUsageHistory.map((p) => ({ x: p.date, y: p.callCount })) }]}
+              emptyMessage="No AI activity yet."
+            />
+          )}
         </div>
       </div>
 

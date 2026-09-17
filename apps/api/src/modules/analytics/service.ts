@@ -15,6 +15,21 @@ export async function getProjectAnalytics(projectId: string, ownerId: string) {
   return { eventCounts, assessmentStats, masterySummary, aiUsage };
 }
 
+/** M10: separate, on-demand endpoints (not folded into getProjectAnalytics) —
+ * matches the existing pattern of the Growth/Analytics tabs each firing several
+ * independent fetches rather than one large combined payload. */
+export async function getProjectMasteryHistory(projectId: string, ownerId: string) {
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) return undefined;
+  return repo.getProjectMasteryHistory(projectId);
+}
+
+export async function getProjectAiUsageHistory(projectId: string, ownerId: string) {
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) return undefined;
+  return repo.getProjectAiUsageHistory(projectId);
+}
+
 export async function getHomeOverview(ownerId: string) {
   const [ownedProjects, overallProgress, areasRequiringAttention, recommendedNextAction, activeProjectId] = await Promise.all([
     listAllProjects(ownerId),

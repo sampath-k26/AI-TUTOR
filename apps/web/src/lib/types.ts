@@ -144,6 +144,24 @@ export interface ProjectAnalytics {
   };
 }
 
+export interface MasteryHistoryPoint {
+  conceptId: string;
+  conceptName: string;
+  date: string;
+  level: number;
+}
+
+export interface AiUsageHistoryPoint {
+  date: string;
+  callCount: number;
+  totalCostUsd: number;
+}
+
+export interface EngagementHistoryPoint {
+  date: string;
+  activeUsers: number;
+}
+
 export interface GlobalAnalytics {
   projectCount: number;
   materialCount: number;

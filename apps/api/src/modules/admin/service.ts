@@ -22,6 +22,14 @@ export async function getEngagement() {
   return repo.getEngagementStats();
 }
 
+export async function getEngagementHistory(days?: number) {
+  return repo.getEngagementHistory(days);
+}
+
+export async function getPlatformAiUsageHistory(days?: number) {
+  return repo.getPlatformAiUsageHistory(days);
+}
+
 export async function getLearningAnalytics() {
   return repo.getPlatformLearningAnalytics();
 }

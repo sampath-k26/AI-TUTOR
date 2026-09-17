@@ -23,6 +23,38 @@ analyticsRouter.get("/projects/:projectId/analytics", async (req, res) => {
   res.json({ analytics });
 });
 
+analyticsRouter.get("/projects/:projectId/analytics/mastery-history", async (req, res) => {
+  const params = projectIdParamSchema.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.flatten() });
+    return;
+  }
+
+  const history = await service.getProjectMasteryHistory(params.data.projectId, req.user!.id);
+  if (!history) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  res.json({ history });
+});
+
+analyticsRouter.get("/projects/:projectId/analytics/ai-usage-history", async (req, res) => {
+  const params = projectIdParamSchema.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.flatten() });
+    return;
+  }
+
+  const history = await service.getProjectAiUsageHistory(params.data.projectId, req.user!.id);
+  if (!history) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  res.json({ history });
+});
+
 analyticsRouter.get("/analytics", async (req, res) => {
   const analytics = await service.getGlobalAnalytics(req.user!.id);
   res.json({ analytics });

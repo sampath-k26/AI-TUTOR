@@ -5,19 +5,19 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 ## AI
 
 - **Gemini's free tier has a real daily cap** (20 requests/day for `gemini-3.6-flash`, separate from its per-minute cap) that a single active development/testing session can exhaust — this happened live while building M5/M6 and is documented in `CLAUDE.md` and `08-EVALUATION.md`. `withRetry()` detects this specific case and fails fast rather than wasting retries, but there is no fallback provider or paid-tier upgrade path wired in.
-- No streaming Tutor responses yet — the Must-Have scope is request/response; streaming is an explicit M8+ item.
 - Open-ended grading and recommendation generation are each a single LLM call with schema validation, not a secondary judge/verification pass (a deliberate prototype-scope tradeoff — decision D15).
+- Streaming Tutor responses (M8+, decision D17) weaken D11's "never show an answer without validated grounding" guarantee for that path specifically: prose streams to the client before its trailing citations are seen, so a post-hoc grounding failure is flagged (a `groundingUncertain` notice) rather than pre-emptively hidden. The non-streaming endpoint (still used by `runEval.ts`) is unaffected.
 - Provider model names can be deprecated without notice — this happened twice during the build (`gemini-2.5-flash`, `llama-3.3-70b-versatile`), each caught via a live 404 and the app's own `ai_usage_log.error_detail`. There's no automated alert for a model going stale; it will surface the same way in production.
 
 ## Retrieval
 
 - Retrieval is deliberately lightweight (decision D9): pgvector cosine similarity over page-aware chunks, no re-ranking step, no hybrid (keyword + vector) search, no query rewriting.
-- Chunking uses fixed-size overlap, not semantic or structure-aware boundaries — a chunk can split a sentence or table across two chunks.
+- Chunking prefers a sentence boundary near its target size (M8+) but is still not paragraph- or table-aware — a chunk can still split a table across two chunks, and the upstream whitespace-collapse step means paragraph breaks aren't preserved as a boundary signal.
 
 ## Documents
 
 - PDF only. No `.docx`/`.pptx`/image uploads.
-- Vision fallback (for scanned/low-text-density pages) runs one page at a time — no batching, so a heavily-scanned document costs proportionally more latency and AI calls.
+- Vision fallback (for scanned/low-text-density pages) batches up to 4 flagged pages per Gemini call (M8+), reducing but not eliminating cost/latency scaling with page count; a page whose delimiter the model fails to echo back in a multi-page batch keeps its original (poor) extracted text rather than losing it, but is still not vision-corrected.
 - A material is processed as a single background job with no partial-progress reporting beyond the four coarse statuses (`queued`/`processing`/`ready`/`failed`) — a very large PDF gives no finer-grained feedback while it processes.
 
 ## Scaling
@@ -50,4 +50,4 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 
 ## Future improvements
 
-Tracked as M8+ in `06-IMPLEMENTATION-PLAN.md`: streaming Tutor responses (SSE), a caching layer for repeated retrieval/analytics queries, persistent Tutor continuity refinements, automated regression evaluation (running `runEval.ts` in CI), and one signature creative feature chosen based on remaining time (concept map visualization, spaced-repetition scheduling, or similar — PRD §21).
+Tracked as M8-M13 in `06-IMPLEMENTATION-PLAN.md`. Done: rich document understanding (M8), streaming Tutor responses (M9), and improved analytics (M10 — day-bucketed mastery/AI-usage/engagement time-series charts, hand-rolled zero-dependency SVG per the dataviz skill's validated palette). Remaining: an in-process caching layer for repeated retrieval/analytics queries (M11), concept maps (M12), learning plans (M13).

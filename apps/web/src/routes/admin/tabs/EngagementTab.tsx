@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
-import type { AdminEngagement, AdminLearningAnalytics } from "../../../lib/types";
+import type { AdminEngagement, AdminLearningAnalytics, EngagementHistoryPoint } from "../../../lib/types";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Skeleton } from "../../../components/ui/skeleton";
+import { LineChart } from "../../../components/charts/LineChart";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -29,10 +30,12 @@ function StatCardSkeleton() {
 export function EngagementTab() {
   const [engagement, setEngagement] = useState<AdminEngagement | null>(null);
   const [learning, setLearning] = useState<AdminLearningAnalytics | null>(null);
+  const [engagementHistory, setEngagementHistory] = useState<EngagementHistoryPoint[] | null>(null);
 
   useEffect(() => {
     apiClient.get<{ engagement: AdminEngagement }>("/admin/engagement").then((res) => setEngagement(res.engagement));
     apiClient.get<{ learningAnalytics: AdminLearningAnalytics }>("/admin/learning-analytics").then((res) => setLearning(res.learningAnalytics));
+    apiClient.get<{ history: EngagementHistoryPoint[] }>("/admin/engagement-history").then((res) => setEngagementHistory(res.history));
   }, []);
 
   return (
@@ -55,6 +58,16 @@ export function EngagementTab() {
             <StatCard label="Total Projects" value={engagement.totalProjects} />
           </div>
         )}
+        <div className="mt-3">
+          {engagementHistory === null ? (
+            <Skeleton className="h-[200px] w-full rounded-md" />
+          ) : (
+            <LineChart
+              series={[{ id: "active-users", label: "Active users per day", points: engagementHistory.map((p) => ({ x: p.date, y: p.activeUsers })) }]}
+              emptyMessage="No engagement history yet."
+            />
+          )}
+        </div>
       </div>
 
       <div>
