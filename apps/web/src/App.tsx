@@ -15,6 +15,7 @@ import { TutorTab } from "./routes/projects/tabs/TutorTab";
 import { QuizTab } from "./routes/projects/tabs/QuizTab";
 import { GrowthTab } from "./routes/projects/tabs/GrowthTab";
 import { AnalyticsTab } from "./routes/projects/tabs/AnalyticsTab";
+import { ConceptMapTab } from "./routes/projects/tabs/ConceptMapTab";
 import { GlobalAnalyticsPage } from "./routes/analytics/GlobalAnalyticsPage";
 import { ActivityLogPage } from "./routes/activity/ActivityLogPage";
 import { AdminLayout } from "./routes/admin/AdminLayout";
@@ -52,6 +53,7 @@ export function App() {
                 <Route path="quiz" element={<QuizTab />} />
                 <Route path="growth" element={<GrowthTab />} />
                 <Route path="analytics" element={<AnalyticsTab />} />
+                <Route path="concept-map" element={<ConceptMapTab />} />
               </Route>
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="users" replace />} />

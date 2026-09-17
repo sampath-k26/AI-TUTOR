@@ -15,6 +15,7 @@ const TABS = [
   { to: "quiz", label: "Quiz" },
   { to: "growth", label: "Growth" },
   { to: "analytics", label: "Analytics" },
+  { to: "concept-map", label: "Concept Map" },
 ];
 
 export function ProjectLayout() {

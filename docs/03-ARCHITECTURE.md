@@ -111,7 +111,7 @@ Each module under `apps/api/src/modules/<name>/` owns: `router.ts` (HTTP only â€
 | Module | Owns | Depends on |
 |---|---|---|
 | `learning` | Spaces, Projects, dashboards | â€” |
-| `materials` | Upload, processing status, chunks/knowledge, storage refs | `learning` (project ownership), `aiProvider` (embeddings/vision) |
+| `materials` | Upload, processing status, chunks/knowledge, storage refs, live concept-map co-occurrence (M12) | `learning` (project ownership), `aiProvider` (embeddings/vision) |
 | `ai` | Tutor conversations, RAG retrieval, prompt construction, citation validation, unsupported-question handling | `materials` (retrieval), `learning` (context), `aiProvider` |
 | `assessment` | Quiz generation/selection, question bank, grading, mastery, growth | `materials` (concepts/content), `aiProvider` |
 | `analytics` | Project + global analytics, User Home overview, event aggregation | reads from all modules' tables (read-only) |

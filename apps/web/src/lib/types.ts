@@ -162,6 +162,11 @@ export interface EngagementHistoryPoint {
   activeUsers: number;
 }
 
+export interface ConceptMap {
+  nodes: Array<{ id: string; name: string }>;
+  edges: Array<{ source: string; target: string; weight: number }>;
+}
+
 export interface GlobalAnalytics {
   projectCount: number;
   materialCount: number;

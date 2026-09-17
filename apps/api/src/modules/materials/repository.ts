@@ -142,3 +142,10 @@ export async function getConceptsByIds(conceptIds: string[]): Promise<Map<string
 export async function listConceptsForProject(projectId: string) {
   return db.select().from(concepts).where(eq(concepts.projectId, projectId));
 }
+
+/** Chunk text only (no embeddings/metadata) — feeds the concept map's live
+ * co-occurrence computation (M12). */
+export async function listChunkContentsForProject(projectId: string): Promise<string[]> {
+  const rows = await db.select({ content: materialChunks.content }).from(materialChunks).where(eq(materialChunks.projectId, projectId));
+  return rows.map((r) => r.content);
+}

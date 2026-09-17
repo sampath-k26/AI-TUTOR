@@ -55,6 +55,22 @@ materialsRouter.post("/projects/:projectId/materials", upload.single("file"), as
   res.status(201).json({ material });
 });
 
+materialsRouter.get("/projects/:projectId/concept-map", async (req, res) => {
+  const params = projectIdParamSchema.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.flatten() });
+    return;
+  }
+
+  const conceptMap = await service.getConceptMap(params.data.projectId, req.user!.id);
+  if (!conceptMap) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  res.json({ conceptMap });
+});
+
 materialsRouter.get("/materials/:materialId", async (req, res) => {
   const params = materialIdParamSchema.safeParse(req.params);
   if (!params.success) {

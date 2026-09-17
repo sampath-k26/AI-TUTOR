@@ -3,6 +3,7 @@ import { getProjectForOwner } from "../learning/service";
 import { uploadMaterialFile } from "../../core/storage";
 import { geminiProvider } from "../../aiProvider";
 import { enqueueProcessMaterial } from "../../workers/processMaterial";
+import { computeConceptCooccurrence } from "./conceptMap";
 import * as repo from "./repository";
 import type { RetrievedChunk } from "./repository";
 
@@ -48,6 +49,21 @@ export async function getConceptsByIds(conceptIds: string[]) {
 
 export async function listConceptsForProject(projectId: string) {
   return repo.listConceptsForProject(projectId);
+}
+
+export async function getConceptMap(projectId: string, ownerId: string) {
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) return undefined;
+
+  const [conceptRows, chunkContents] = await Promise.all([
+    repo.listConceptsForProject(projectId),
+    repo.listChunkContentsForProject(projectId),
+  ]);
+
+  return computeConceptCooccurrence(
+    conceptRows.map((c) => ({ id: c.id, name: c.name })),
+    chunkContents,
+  );
 }
 
 /**

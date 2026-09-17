@@ -13,6 +13,7 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 
 - Retrieval is deliberately lightweight (decision D9): pgvector cosine similarity over page-aware chunks, no re-ranking step, no hybrid (keyword + vector) search, no query rewriting.
 - Chunking prefers a sentence boundary near its target size (M8+) but is still not paragraph- or table-aware — a chunk can still split a table across two chunks, and the upstream whitespace-collapse step means paragraph breaks aren't preserved as a boundary signal.
+- The concept map's edges (M12, decision D19) are a coarse proxy for true semantic relationship — two concepts "co-occur" only when their names both literally appear (case-insensitive substring) in the same chunk, so a well-organized document whose sections each cover one concept in isolation (verified live against this project's own `cell_biology.pdf` fixture) can legitimately show few or no edges even though the concepts are related.
 
 ## Documents
 
@@ -50,4 +51,4 @@ Honest disclosure per submission requirement §18.8, organized by the categories
 
 ## Future improvements
 
-Tracked as M8-M13 in `06-IMPLEMENTATION-PLAN.md`. Done: rich document understanding (M8), streaming Tutor responses (M9), improved analytics (M10 — day-bucketed mastery/AI-usage/engagement time-series charts, hand-rolled zero-dependency SVG per the dataviz skill's validated palette), and an in-process caching layer for analytics/admin dashboard aggregates (M11, decision D18). Remaining: concept maps (M12), learning plans (M13).
+Tracked as M8-M13 in `06-IMPLEMENTATION-PLAN.md`. Done: rich document understanding (M8), streaming Tutor responses (M9), improved analytics (M10 — day-bucketed mastery/AI-usage/engagement time-series charts, hand-rolled zero-dependency SVG per the dataviz skill's validated palette), an in-process caching layer for analytics/admin dashboard aggregates (M11, decision D18), and a live heuristic concept map (M12, decision D19 — circular-layout SVG, edges from substring co-occurrence, optionally colored by growth trend). Remaining: learning plans (M13).
