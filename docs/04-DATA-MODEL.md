@@ -135,6 +135,28 @@ Index: `ivfflat` (or `hnsw`) on `embedding`, plus a btree on `project_id` so sim
 | status | text | `active`\|`dismissed`\|`completed` |
 | created_at | timestamptz | |
 
+### `learning_plans` (M13)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| project_id | uuid FK, cascade | |
+| status | text | `active`\|`archived` — regenerating archives the previous active plan rather than deleting it |
+| rationale | jsonb | e.g. `{weakConcepts: string[], materialCount: number}` — what drove this plan's steps |
+| created_at | timestamptz | |
+
+### `learning_plan_steps` (M13)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| plan_id | uuid FK, cascade | |
+| order_index | int | display/execution order within the plan |
+| type | text | `material`\|`tutor`\|`quiz`\|`other` |
+| description | text | a specific, actionable instruction, not vague encouragement |
+| related_material_id | uuid FK, **set null** | first `set null` FK in this schema — a step outliving its linked material shouldn't disappear |
+| related_concept_id | uuid FK, **set null** | same reasoning, for a linked concept |
+| completed | bool | |
+| completed_at | timestamptz nullable | |
+
 ### `learning_context`
 | column | type | notes |
 |---|---|---|
@@ -160,7 +182,7 @@ Index: `ivfflat` (or `hnsw`) on `embedding`, plus a btree on `project_id` so sim
 | column | type | notes |
 |---|---|---|
 | id | uuid PK | |
-| feature | text | `tutor`\|`quiz_generation`\|`grading`\|`recommendation`\|`document_understanding`\|`embedding`\|`eval` |
+| feature | text | `tutor`\|`quiz_generation`\|`grading`\|`recommendation`\|`document_understanding`\|`embedding`\|`eval`\|`learning_plan` |
 | provider, model | text | e.g. `gemini`, `gemini-3.6-flash` |
 | latency_ms | int | |
 | tokens_in, tokens_out | int | |

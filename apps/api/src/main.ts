@@ -8,6 +8,7 @@ import { aiRouter } from "./modules/ai/router";
 import { assessmentRouter } from "./modules/assessment/router";
 import { analyticsRouter } from "./modules/analytics/router";
 import { adminRouter } from "./modules/admin/router";
+import { learningPlansRouter } from "./modules/learningPlans/router";
 
 const app = express();
 
@@ -24,6 +25,10 @@ app.use("/api", materialsRouter);
 app.use("/api", aiRouter);
 app.use("/api", assessmentRouter);
 app.use("/api", analyticsRouter);
+app.use("/api", learningPlansRouter);
+// adminRouter must be mounted last: its own requireAdmin middleware runs (and can
+// 403-terminate the request) for every /api/* path that reaches it, not just its
+// own routes — a router mounted after it would never be reached for a non-admin caller.
 app.use("/api", adminRouter);
 
 // Central error handler — catches everything forwarded via next(err), including

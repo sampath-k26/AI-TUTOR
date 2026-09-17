@@ -167,6 +167,26 @@ export interface ConceptMap {
   edges: Array<{ source: string; target: string; weight: number }>;
 }
 
+export interface LearningPlan {
+  id: string;
+  projectId: string;
+  status: "active" | "archived";
+  rationale: { weakConcepts?: string[]; materialCount?: number } | null;
+  createdAt: string;
+}
+
+export interface LearningPlanStep {
+  id: string;
+  planId: string;
+  orderIndex: number;
+  type: "material" | "tutor" | "quiz" | "other";
+  description: string;
+  relatedMaterialId: string | null;
+  relatedConceptId: string | null;
+  completed: boolean;
+  completedAt: string | null;
+}
+
 export interface GlobalAnalytics {
   projectCount: number;
   materialCount: number;

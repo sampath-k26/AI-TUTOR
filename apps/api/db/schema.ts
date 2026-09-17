@@ -45,7 +45,10 @@ export const aiFeatureEnum = pgEnum("ai_feature", [
   "document_understanding",
   "embedding",
   "eval",
+  "learning_plan",
 ]);
+export const learningPlanStatusEnum = pgEnum("learning_plan_status", ["active", "archived"]);
+export const learningPlanStepTypeEnum = pgEnum("learning_plan_step_type", ["material", "tutor", "quiz", "other"]);
 
 // Extends Supabase's auth.users — id must equal auth.users.id (see db/migrations for the FK note).
 export const profiles = pgTable("profiles", {
@@ -347,6 +350,40 @@ export const aiUsageLog = pgTable(
     index("ai_usage_log_feature_idx").on(table.feature),
     index("ai_usage_log_created_at_idx").on(table.createdAt),
   ],
+);
+
+export const learningPlans = pgTable(
+  "learning_plans",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    status: learningPlanStatusEnum("status").notNull().default("active"),
+    rationale: jsonb("rationale"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("learning_plans_project_id_idx").on(table.projectId)],
+);
+
+export const learningPlanSteps = pgTable(
+  "learning_plan_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => learningPlans.id, { onDelete: "cascade" }),
+    orderIndex: integer("order_index").notNull(),
+    type: learningPlanStepTypeEnum("type").notNull(),
+    description: text("description").notNull(),
+    // set null (not cascade): a step outliving its linked material/concept should
+    // stay on the plan as a step, not disappear because the source was deleted/reprocessed.
+    relatedMaterialId: uuid("related_material_id").references(() => materials.id, { onDelete: "set null" }),
+    relatedConceptId: uuid("related_concept_id").references(() => concepts.id, { onDelete: "set null" }),
+    completed: boolean("completed").notNull().default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [index("learning_plan_steps_plan_id_idx").on(table.planId)],
 );
 
 export const evalResult = pgTable(

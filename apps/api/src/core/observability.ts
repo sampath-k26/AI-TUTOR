@@ -10,7 +10,8 @@ export type AiFeature =
   | "recommendation"
   | "document_understanding"
   | "embedding"
-  | "eval";
+  | "eval"
+  | "learning_plan";
 
 export interface AiUsageRecord {
   feature: AiFeature;

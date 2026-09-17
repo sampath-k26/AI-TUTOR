@@ -8,6 +8,27 @@
       "when": 1789538226810,
       "tag": "0000_blue_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789643485956,
+      "tag": "0002_add_learning_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789643485957,
+      "tag": "0003_learning_plans_rls_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789643714194,
+      "tag": "0004_add_learning_plan_ai_feature",
+      "breakpoints": true
     }
   ]
 }

@@ -116,6 +116,7 @@ Each module under `apps/api/src/modules/<name>/` owns: `router.ts` (HTTP only â€
 | `assessment` | Quiz generation/selection, question bank, grading, mastery, growth | `materials` (concepts/content), `aiProvider` |
 | `analytics` | Project + global analytics, User Home overview, event aggregation | reads from all modules' tables (read-only) |
 | `admin` | User/Space/Project inspection, filterable activity, engagement, platform-wide learning analytics, AI usage/eval views, background-job status, system health | reads from all modules' tables (read-only) + `pgboss.job` directly, enforces admin role via `requireAdmin` |
+| `learningPlans` | AI-generated, regenerable ordered study checklists per Project, step completion (M13) | `learning` (project ownership), `assessment` (growth overview), `materials` (processed materials), `aiProvider` |
 
 Recommendations ended up living inside `assessment` (repository/schemas) with their generation logic in `workers/generateRecommendation.ts` rather than a standalone module â€” the orchestration needed both `assessment`'s repository and a call out to `ai`'s provider, and giving it its own module would have meant a third module importing across the same boundary for no isolation benefit.
 
