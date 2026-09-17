@@ -13,6 +13,7 @@ const retrievalMocks = vi.hoisted(() => ({
 
 const aiProviderMocks = vi.hoisted(() => ({
   generateStructured: vi.fn(),
+  generateTextStream: vi.fn(),
 }));
 
 const learningServiceMocks = vi.hoisted(() => ({
@@ -29,7 +30,18 @@ vi.mock("../../src/aiProvider", () => ({ geminiProvider: aiProviderMocks, GEMINI
 vi.mock("../../src/modules/learning/service", () => learningServiceMocks);
 vi.mock("../../src/modules/materials/service", () => materialsServiceMocks);
 
-const { handleTutorMessage } = await import("../../src/modules/ai/service");
+const { handleTutorMessage, handleTutorMessageStream } = await import("../../src/modules/ai/service");
+
+/** Wraps an array of raw provider chunks as the async generator handleTutorMessageStream expects. */
+async function* fakeStream(chunks: string[]): AsyncGenerator<string> {
+  for (const chunk of chunks) yield chunk;
+}
+
+async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const event of gen) out.push(event);
+  return out;
+}
 
 const PROJECT = { id: "proj-1", name: "ML Basics", learningGoal: "Understand gradient descent" };
 const CONVERSATION = { id: "conv-1" };
@@ -121,5 +133,136 @@ describe("handleTutorMessage", () => {
 
     expect(result?.insufficientEvidence).toBe(false);
     expect(result?.citations).toEqual([{ materialId: "mat-1", materialName: "Machine Learning Notes", page: 14 }]);
+  });
+});
+
+describe("handleTutorMessageStream", () => {
+  it("returns undefined when the project isn't found/owned", async () => {
+    learningServiceMocks.getProjectForOwner.mockResolvedValue(undefined);
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "question", undefined);
+    expect(stream).toBeUndefined();
+  });
+
+  it("streams the canned insufficient-evidence reply without calling the model when retrieval finds nothing", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([]);
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "off-topic question", undefined);
+    const events = await collect(stream!);
+
+    expect(aiProviderMocks.generateTextStream).not.toHaveBeenCalled();
+    expect(events[0]).toEqual({ type: "start", conversationId: "conv-1" });
+    expect(events.at(-1)).toEqual({ type: "done", citations: [], insufficientEvidence: true, groundingUncertain: false });
+  });
+
+  it("streams prose token-by-token and emits validated citations once the tail is parsed", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 14, content: "gradient descent minimizes loss", similarity: 0.92 },
+    ]);
+    aiProviderMocks.generateTextStream.mockReturnValue(
+      fakeStream([
+        "Gradient descent ",
+        "minimizes the loss function.",
+        "\n---CITATIONS_JSON---\n",
+        '{"insufficientEvidence":false,"citations":[{"materialId":"mat-1","page":14}]}',
+      ]),
+    );
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "What is gradient descent?", undefined);
+    const events = await collect(stream!);
+
+    const tokenEvents = events.filter((e) => e.type === "token");
+    expect(tokenEvents.map((e) => e.delta).join("")).toBe("Gradient descent minimizes the loss function.");
+    expect(events.at(-1)).toEqual({
+      type: "done",
+      citations: [{ materialId: "mat-1", materialName: "Machine Learning Notes", page: 14 }],
+      insufficientEvidence: false,
+      groundingUncertain: false,
+    });
+    expect(repoMocks.saveMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "assistant", content: "Gradient descent minimizes the loss function." }),
+    );
+  });
+
+  it("reassembles a delimiter split across two provider chunks without leaking a partial delimiter as a token", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 1, content: "evidence", similarity: 0.9 },
+    ]);
+    aiProviderMocks.generateTextStream.mockReturnValue(
+      fakeStream([
+        "The answer.\n---CITATIONS_JS",
+        'ON---\n{"insufficientEvidence":false,"citations":[{"materialId":"mat-1","page":1}]}',
+      ]),
+    );
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "question", undefined);
+    const events = await collect(stream!);
+
+    const tokenEvents = events.filter((e) => e.type === "token");
+    expect(tokenEvents.map((e) => e.delta).join("")).toBe("The answer.");
+    expect(events.at(-1)).toMatchObject({ type: "done", insufficientEvidence: false, groundingUncertain: false });
+  });
+
+  it("flags groundingUncertain rather than hiding already-streamed prose when citations don't validate", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 14, content: "real evidence", similarity: 0.9 },
+    ]);
+    aiProviderMocks.generateTextStream.mockReturnValue(
+      fakeStream(["Some streamed prose.", "\n---CITATIONS_JSON---\n", '{"insufficientEvidence":false,"citations":[{"materialId":"mat-1","page":999}]}']),
+    );
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "question", undefined);
+    const events = await collect(stream!);
+
+    const tokenEvents = events.filter((e) => e.type === "token");
+    expect(tokenEvents.map((e) => e.delta).join("")).toBe("Some streamed prose.");
+    expect(events.some((e) => e.type === "notice")).toBe(true);
+    expect(events.at(-1)).toEqual({ type: "done", citations: [], insufficientEvidence: false, groundingUncertain: true });
+    expect(repoMocks.saveMessage).toHaveBeenCalledWith(expect.objectContaining({ content: "Some streamed prose.", citations: [] }));
+  });
+
+  it("keeps the model's own brief note when it declares insufficientEvidence in the tail after streaming some prose", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 1, content: "loosely related", similarity: 0.51 },
+    ]);
+    aiProviderMocks.generateTextStream.mockReturnValue(
+      fakeStream(["I don't see enough evidence for that.", "\n---CITATIONS_JSON---\n", '{"insufficientEvidence":true,"citations":[]}']),
+    );
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "tangential question", undefined);
+    const events = await collect(stream!);
+
+    const tokenEvents = events.filter((e) => e.type === "token");
+    expect(tokenEvents.map((e) => e.delta).join("")).toBe("I don't see enough evidence for that.");
+    expect(events.at(-1)).toEqual({ type: "done", citations: [], insufficientEvidence: true, groundingUncertain: false });
+  });
+
+  it("falls back to the canned insufficient-evidence reply when the model never emits the delimiter and produced no real prose", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 1, content: "evidence", similarity: 0.9 },
+    ]);
+    aiProviderMocks.generateTextStream.mockReturnValue(fakeStream(["   "]));
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "question", undefined);
+    const events = await collect(stream!);
+
+    expect(events.at(-1)).toEqual({ type: "done", citations: [], insufficientEvidence: true, groundingUncertain: false });
+  });
+
+  it("emits an error event and persists nothing when the provider fails mid-stream", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 1, content: "evidence", similarity: 0.9 },
+    ]);
+    aiProviderMocks.generateTextStream.mockReturnValue(
+      (async function* () {
+        yield "Partial answer";
+        throw new Error("stream interrupted");
+      })(),
+    );
+
+    const stream = await handleTutorMessageStream("proj-1", "user-1", "question", undefined);
+    const events = await collect(stream!);
+
+    expect(events.at(-1)).toEqual({ type: "error", message: "The Tutor's response was interrupted." });
+    expect(repoMocks.saveMessage).not.toHaveBeenCalledWith(expect.objectContaining({ role: "assistant" }));
   });
 });

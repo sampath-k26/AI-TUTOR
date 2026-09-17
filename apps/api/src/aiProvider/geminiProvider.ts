@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
 import { z, type ZodType } from "zod";
 import { config } from "../core/config";
 import { logAiUsage } from "../core/observability";
@@ -11,6 +11,7 @@ import {
   type GenerateStructuredParams,
   type GenerateTextParams,
   type GenerateTextResult,
+  type StreamingTextProvider,
   type TextProvider,
   type UnderstandDocumentBatchParams,
   type UnderstandDocumentParams,
@@ -40,7 +41,7 @@ function estimateCostUsd(model: string, tokensIn: number, tokensOut: number): nu
   return (tokensIn / 1_000_000) * rate.input + (tokensOut / 1_000_000) * rate.output;
 }
 
-export class GeminiProvider implements TextProvider, EmbeddingProvider, DocumentUnderstandingProvider {
+export class GeminiProvider implements TextProvider, EmbeddingProvider, DocumentUnderstandingProvider, StreamingTextProvider {
   private client: GoogleGenAI;
 
   constructor(apiKey: string = config.GEMINI_API_KEY) {
@@ -87,6 +88,78 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
       });
       throw new AiGenerationError("Gemini text generation failed", "gemini", err);
     }
+  }
+
+  /**
+   * Plain-text token streaming (M9) — deliberately not the JSON-schema-constrained
+   * mode `generateStructured` uses, since streaming partial JSON isn't safely
+   * displayable token-by-token. `withRetry` wraps only stream *establishment*
+   * (this call either throws before any tokens exist, or hands back a working
+   * iterator) — it must never wrap the `for await` consumption below, since a
+   * mid-stream failure after tokens have already reached a caller can't be
+   * silently retried without duplicating or corrupting what was already shown.
+   */
+  async *generateTextStream(params: GenerateTextParams): AsyncGenerator<string> {
+    const start = Date.now();
+
+    let stream: AsyncGenerator<GenerateContentResponse>;
+    try {
+      stream = await withRetry(() =>
+        this.client.models.generateContentStream({
+          model: TEXT_MODEL,
+          contents: params.prompt,
+          config: params.systemInstruction ? { systemInstruction: params.systemInstruction } : undefined,
+        }),
+      );
+    } catch (err) {
+      await logAiUsage({
+        feature: params.feature,
+        provider: "gemini",
+        model: TEXT_MODEL,
+        latencyMs: Date.now() - start,
+        success: false,
+        errorDetail: err instanceof Error ? err.message : String(err),
+        relatedEntity: params.relatedEntity,
+      });
+      throw new AiGenerationError("Gemini streaming generation failed to start", "gemini", err);
+    }
+
+    let tokensIn = 0;
+    let tokensOut = 0;
+    try {
+      for await (const chunk of stream) {
+        if (chunk.usageMetadata) {
+          tokensIn = chunk.usageMetadata.promptTokenCount ?? tokensIn;
+          tokensOut = chunk.usageMetadata.candidatesTokenCount ?? tokensOut;
+        }
+        if (chunk.text) yield chunk.text;
+      }
+    } catch (err) {
+      await logAiUsage({
+        feature: params.feature,
+        provider: "gemini",
+        model: TEXT_MODEL,
+        latencyMs: Date.now() - start,
+        tokensIn,
+        tokensOut,
+        success: false,
+        errorDetail: err instanceof Error ? err.message : String(err),
+        relatedEntity: params.relatedEntity,
+      });
+      throw new AiGenerationError("Gemini streaming generation failed mid-stream", "gemini", err);
+    }
+
+    await logAiUsage({
+      feature: params.feature,
+      provider: "gemini",
+      model: TEXT_MODEL,
+      latencyMs: Date.now() - start,
+      tokensIn,
+      tokensOut,
+      estimatedCostUsd: estimateCostUsd(TEXT_MODEL, tokensIn, tokensOut),
+      success: true,
+      relatedEntity: params.relatedEntity,
+    });
   }
 
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {

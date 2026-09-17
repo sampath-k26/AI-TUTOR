@@ -55,6 +55,12 @@ export interface TextProvider {
   generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T>;
 }
 
+/** Only Gemini implements this — plain-text token streaming for the Tutor (M9). Not
+ * part of TextProvider since Groq (MCQ generation only) has no streaming need today. */
+export interface StreamingTextProvider {
+  generateTextStream(params: GenerateTextParams): AsyncGenerator<string>;
+}
+
 /** Only Gemini implements this — see decision D7 (Groq has no embeddings in its free tier). */
 export interface EmbeddingProvider {
   embed(params: EmbedParams): Promise<number[]>;

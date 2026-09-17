@@ -30,6 +30,14 @@ app.use("/api", adminRouter);
 // rejected promises from async route handlers (Express 5 does this automatically).
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err);
+  // A streaming route (M9) may already have written and flushed response headers
+  // before failing — calling res.status()/json() at that point throws
+  // ERR_HTTP_HEADERS_SENT. Just end the response; the client already got a
+  // stream-level error event.
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
   res.status(500).json({ error: "Internal server error" });
 };
 app.use(errorHandler);

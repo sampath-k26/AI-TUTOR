@@ -26,3 +26,19 @@ export const tutorResponseSchema = z.object({
   citations: z.array(citationSchema),
 });
 export type TutorResponse = z.infer<typeof tutorResponseSchema>;
+
+/** Just the trailing JSON tail of a streamed answer (M9) — the streaming path gets
+ * `answer` incrementally as tokens, so only these two fields are parsed from the tail. */
+export const tutorStreamTailSchema = tutorResponseSchema.pick({ insufficientEvidence: true, citations: true });
+export type TutorStreamTail = z.infer<typeof tutorStreamTailSchema>;
+
+export type TutorCitation = { materialId: string; materialName: string; page: number };
+
+/** Wire protocol for POST .../tutor/messages/stream — one JSON object per line
+ * (newline-delimited), not a Zod schema since it's never parsed as untrusted input. */
+export type TutorStreamEvent =
+  | { type: "start"; conversationId: string }
+  | { type: "token"; delta: string }
+  | { type: "notice"; message: string }
+  | { type: "done"; citations: TutorCitation[]; insufficientEvidence: boolean; groundingUncertain: boolean }
+  | { type: "error"; message: string };

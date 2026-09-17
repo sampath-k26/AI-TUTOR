@@ -55,6 +55,14 @@ export interface TutorReply {
   insufficientEvidence: boolean;
 }
 
+/** Mirrors apps/api/src/modules/ai/schemas.ts's TutorStreamEvent (M9). */
+export type TutorStreamEvent =
+  | { type: "start"; conversationId: string }
+  | { type: "token"; delta: string }
+  | { type: "notice"; message: string }
+  | { type: "done"; citations: Citation[]; insufficientEvidence: boolean; groundingUncertain: boolean }
+  | { type: "error"; message: string };
+
 export interface Quiz {
   id: string;
   projectId: string;
