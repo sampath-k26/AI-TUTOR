@@ -22,6 +22,30 @@ export const DEFAULT_CHUNKING_OPTIONS: ChunkingOptions = {
   overlapRatio: 0.12,
 };
 
+// How far back from a hard cutoff to look for a sentence-ending boundary before
+// giving up and cutting mid-sentence anyway. Scoped to sentences only (not
+// paragraphs) since the whitespace-collapse below already destroys paragraph
+// breaks before this point.
+const BOUNDARY_LOOKBACK_CHARS = 200;
+const SENTENCE_BOUNDARY = /[.?!](?=\s)/g;
+
+/** Prefers cutting at the last sentence boundary within the lookback window
+ * before `hardEnd`; falls back to `hardEnd` itself (today's exact behavior)
+ * when none is found, or when `hardEnd` already reaches the end of the text. */
+function findCutPoint(text: string, start: number, hardEnd: number): number {
+  if (hardEnd >= text.length) return hardEnd;
+
+  const windowStart = Math.max(start, hardEnd - BOUNDARY_LOOKBACK_CHARS);
+  const window = text.slice(windowStart, hardEnd);
+
+  let lastBoundaryEnd = -1;
+  for (const match of window.matchAll(SENTENCE_BOUNDARY)) {
+    lastBoundaryEnd = match.index + match[0].length;
+  }
+
+  return lastBoundaryEnd === -1 ? hardEnd : windowStart + lastBoundaryEnd;
+}
+
 export function chunkPage(page: ExtractedPage, options: ChunkingOptions = DEFAULT_CHUNKING_OPTIONS): Chunk[] {
   const text = page.text.trim().replace(/\s+/g, " ");
   if (text.length === 0) return [];
@@ -31,12 +55,17 @@ export function chunkPage(page: ExtractedPage, options: ChunkingOptions = DEFAUL
   }
 
   const step = Math.max(1, Math.round(options.targetChars * (1 - options.overlapRatio)));
+  const overlapChars = options.targetChars - step;
   const chunks: Chunk[] = [];
 
-  for (let start = 0; start < text.length; start += step) {
-    const end = Math.min(start + options.targetChars, text.length);
+  for (let start = 0; start < text.length; ) {
+    const hardEnd = Math.min(start + options.targetChars, text.length);
+    const end = findCutPoint(text, start, hardEnd);
     chunks.push({ pageNumber: page.pageNumber, content: text.slice(start, end) });
     if (end === text.length) break;
+    // Falls back to exactly `start + step` when no boundary was found — same
+    // fixed-step advance as before this change.
+    start = Math.max(start + 1, end - overlapChars);
   }
 
   return chunks;

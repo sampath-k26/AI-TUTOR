@@ -56,3 +56,39 @@ export async function extractPageTextViaVision(imageBase64: string, projectConte
     feature: "document_understanding",
   });
 }
+
+// Multiple flagged pages per Gemini call (fewer calls = lower cost/latency, relevant
+// given the free-tier daily cap) rather than one call per page. Trades that for a new
+// failure mode: the model may not perfectly delimit every page in a multi-page reply —
+// callers must treat a page missing from the returned map as "no vision text produced
+// for this page", never as "produced empty text".
+const PAGE_DELIMITER = /={3}\s*PAGE\s+(\d+)\s*={3}/gi;
+
+export function parseVisionBatchResponse(raw: string): Map<number, string> {
+  const result = new Map<number, string>();
+  const parts = raw.split(PAGE_DELIMITER);
+  for (let i = 1; i < parts.length; i += 2) {
+    const pageNumber = Number(parts[i]);
+    const text = (parts[i + 1] ?? "").trim();
+    if (!Number.isNaN(pageNumber) && text) result.set(pageNumber, text);
+  }
+  return result;
+}
+
+export async function extractPagesTextViaVisionBatch(
+  images: Array<{ pageNumber: number; imageBase64: string }>,
+  projectContext: string,
+): Promise<Map<number, string>> {
+  const raw = await geminiProvider.understandDocumentBatch({
+    images: images.map((img) => ({ pageNumber: img.pageNumber, imageBase64: img.imageBase64, mimeType: "image/png" })),
+    prompt:
+      "Extract all readable text from each of the following document pages as plain text, preserving " +
+      "structure such as headings, lists, and tables (represent tables as simple readable rows) where " +
+      "possible. Immediately before each page's extracted text, output a line in the exact form " +
+      "===PAGE <N>=== using that page's number as given by its own --- PAGE <N> --- marker below. " +
+      `Return only the delimited extracted text, no commentary. Context: ${projectContext}`,
+    feature: "document_understanding",
+  });
+
+  return parseVisionBatchResponse(raw);
+}

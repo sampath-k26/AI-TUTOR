@@ -34,7 +34,7 @@ vi.mock("../../src/modules/materials/processing/extract", () => ({
 }));
 vi.mock("../../src/modules/materials/processing/visionFallback", () => ({
   renderPagesToPngBase64: vi.fn(),
-  extractPageTextViaVision: vi.fn(),
+  extractPagesTextViaVisionBatch: vi.fn(),
 }));
 vi.mock("../../src/modules/materials/processing/chunking", () => ({ chunkPages: vi.fn(() => []) }));
 vi.mock("../../src/modules/materials/processing/conceptExtraction", () => ({ extractConcepts: vi.fn().mockResolvedValue([]) }));

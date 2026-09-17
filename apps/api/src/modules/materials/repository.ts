@@ -112,12 +112,17 @@ export async function getFilenamesByIds(materialIds: string[]): Promise<Map<stri
   return new Map(rows.map((r) => [r.id, r.originalFilename]));
 }
 
-export async function insertConcepts(projectId: string, materialId: string, names: string[]) {
-  if (names.length === 0) return;
+export async function insertConcepts(
+  projectId: string,
+  materialId: string,
+  newConcepts: Array<{ name: string; description: string }>,
+) {
+  if (newConcepts.length === 0) return;
   await db.insert(concepts).values(
-    names.map((name) => ({
+    newConcepts.map(({ name, description }) => ({
       projectId,
       name,
+      description,
       sourceMaterialIds: [materialId],
     })),
   );

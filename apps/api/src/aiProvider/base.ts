@@ -37,6 +37,14 @@ export interface UnderstandDocumentParams {
   relatedEntity?: Record<string, unknown>;
 }
 
+export interface UnderstandDocumentBatchParams {
+  /** each entry rendered as its own image part, in order, preceded by a page marker */
+  images: Array<{ pageNumber: number; imageBase64: string; mimeType: string }>;
+  prompt: string;
+  feature: AiFeature;
+  relatedEntity?: Record<string, unknown>;
+}
+
 /**
  * Implemented by both providers (decision D7/D8). Every call to a provider method
  * must log to ai_usage_log itself (via core/observability.logAiUsage) — callers
@@ -55,6 +63,8 @@ export interface EmbeddingProvider {
 /** Only Gemini implements this — see decision D7 (Groq has no native vision/document understanding). */
 export interface DocumentUnderstandingProvider {
   understandDocument(params: UnderstandDocumentParams): Promise<string>;
+  /** Raw model output for a batch of page images — caller parses per-page delimiters. */
+  understandDocumentBatch(params: UnderstandDocumentBatchParams): Promise<string>;
 }
 
 export class AiGenerationError extends Error {

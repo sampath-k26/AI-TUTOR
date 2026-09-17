@@ -38,6 +38,21 @@ describe("chunkPage", () => {
     expect(secondChunk!.content).toContain(overlapTail);
   });
 
+  it("prefers cutting at a sentence boundary over a mid-word hard cutoff", () => {
+    // Each sentence is short and clearly delimited, and the hard cutoff (targetChars=100)
+    // is deliberately positioned to land mid-word absent boundary-aware cutting.
+    const sentences = Array.from({ length: 20 }, (_, i) => `This is sentence number ${i} in the document.`);
+    const longText = sentences.join(" ");
+    const chunks = chunkPage(page(1, longText), { targetChars: 100, overlapRatio: 0.1 });
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks.slice(0, -1)) {
+      // every non-final chunk should end right after sentence-ending punctuation,
+      // not mid-word
+      expect(chunk.content).toMatch(/[.?!]$/);
+    }
+  });
+
   it("covers the full text with no gaps between chunk start positions", () => {
     const longText = Array.from({ length: 400 }, (_, i) => String(i).padStart(4, "0")).join("");
     const chunks = chunkPage(page(1, longText), { targetChars: 500, overlapRatio: 0.1 });

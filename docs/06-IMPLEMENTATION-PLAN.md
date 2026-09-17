@@ -59,8 +59,44 @@ Approach: **one continuous build** (per your instruction), sequenced so that at 
 - Record demo video walking the full loop from `01-REQUIREMENTS-MAP.md` §17/§18.
 - **Exit check:** the public URL demonstrates the full loop from a clean browser session; repo is public and self-explanatory to a stranger.
 
-### M8+ — Should/Nice-to-Have (only after M0-M7 are solid)
-In priority order if time remains: streaming Tutor responses (SSE) → caching for repeated retrieval/analytics queries → persistent Tutor continuity refinements → automated regression evaluation (run `runEval.ts` in CI) → one signature creative feature (candidates per PRD §21: concept map visualization, spaced-repetition scheduling, or similar) — chosen based on remaining time, not committed to upfront.
+### M8 — Rich Document Understanding
+- Persist concept descriptions: `extractConcepts()` already returns `{name, description}`, but `workers/processMaterial.ts` drops `description` before insert — pass it through; `concepts.description` already exists (nullable), no migration.
+- Structure-aware chunking: `chunking.ts`'s `chunkPage()` prefers cutting at the last sentence boundary (`. `/`? `/`! `) within a lookback window near the target size, falling back to the hard character cutoff only when none is found — scoped to sentence boundaries only, since the upstream whitespace-collapse step already destroys paragraph breaks before chunking runs.
+- Batch vision fallback: new `understandDocumentBatch()` on the AI provider interface, up to ~4 flagged low-text pages per Gemini call (page-delimited prompt/response) instead of one call per page; a page missing its delimiter in the model's response is left out of the result map (keeps its original extracted text) rather than overwritten with empty text.
+- **Exit check:** upload a multi-page PDF with real prose and a scanned page; confirm concepts show non-null `description`, a chunk boundary lands after sentence-ending punctuation, and vision fallback produces fewer `ai_usage_log` rows than flagged pages.
+
+### M9 — Streaming Tutor Responses
+- New `generateTextStream()` on the AI provider (plain-text `generateContentStream`, no JSON schema) — usage logging fires only once the stream fully drains; `withRetry()` wraps stream *establishment* only, never the token-consumption loop.
+- New `handleTutorMessageStream()` alongside the existing `handleTutorMessage()` (left untouched — `scripts/runEval.ts` imports it directly, not over HTTP): same evidence gate and citation-validation logic, but the model streams prose first, then a fixed delimiter, then a JSON citations tail; tokens forward to the client as they arrive, delimiter-and-tail are buffered and validated after the stream ends.
+- New decision **D17**: if citation validation fails *after* prose has already streamed, don't retroactively hide it (can't un-render read tokens) — flag it with a distinct `groundingUncertain` notice instead. Weakens D11's guarantee for the streaming path only; the non-streaming endpoint is unaffected.
+- Transport: newline-delimited JSON over an authenticated `fetch` POST (not native `EventSource`, which can't carry the app's Bearer header) — new `POST .../tutor/messages/stream` route, new `apiClient.postStream()`, `TutorTab.tsx` appends deltas to a live message.
+- Companion fix: `main.ts`'s global error handler is missing a `res.headersSent` check — a pre-existing latent bug this feature would otherwise expose as `ERR_HTTP_HEADERS_SENT`.
+- **Exit check:** a grounded question renders token-by-token with an accurate final citation; `runEval.ts` still passes unmodified against the untouched non-streaming path.
+
+### M10 — Improved Analytics (Time-Series Charts)
+- New day-bucketed aggregation queries on data that already exists: mastery-over-time (`growth_snapshots`), AI usage-over-time (`ai_usage_log`), engagement-over-time (`events`) — no new tables.
+- One reusable hand-rolled SVG `LineChart` component (no charting library — keeps the frontend's dependency surface at zero for this concern); wired into Growth, Project Analytics, and Admin Engagement/AI&System tabs.
+- **Exit check:** a Project with quiz activity across multiple days shows a real multi-point mastery line per concept, not flat/mock data.
+
+### M11 — In-Process Caching
+- New `core/cache.ts`: a `Map`-based TTL `withCache(key, ttlMs, fn)` wrapper (~30s), applied only to the repeated-read aggregations in `analytics/repository.ts` and `admin/repository.ts` — never to Growth's live mastery reads or Admin's System Health checks, which must stay real-time.
+- Hard rule: every project/owner-scoped cache key embeds that scoping ID, or this reintroduces a cross-tenant leak against D16.
+- New decision **D18**: in-process, not Redis — extends the existing no-Redis precedent (A3/D13); accepted limitation that it's per-process and cold after every deploy/restart.
+- **Exit check:** two rapid calls to the same project's analytics endpoint hit the DB once; two different projects' calls never leak each other's cached values.
+
+### M12 — Concept Maps
+- Lives inside `materials` (same precedent as `recommendations` living inside `assessment`), computed live per request rather than precomputed: `concepts` has no idempotent reprocessing story the way `material_chunks` does, and co-occurrence is inherently project-wide, so a precomputed table would need a full recompute on every reprocess — live sidesteps that entirely.
+- New decision **D19**: edges from heuristic substring co-occurrence (concepts sharing a material chunk, weighted by shared-chunk count) — zero extra Gemini calls, not an AI-inferred-relationship call. Named limitation: substring matching is a coarse proxy for true semantic relationship.
+- New `GET /projects/:id/concept-map`; frontend renders a fixed circular layout (no graph library) with edge thickness scaled by weight.
+- **Exit check:** a Project with concepts spanning 2+ materials shows at least one edge with visibly different thickness for a more-frequently-co-occurring pair.
+
+### M13 — Learning Plans
+- New module (`modules/learningPlans/`, following the `assessment` template exactly) and the only M8+ milestone needing a schema migration: `learning_plans` (one active plan per Project, archived on regenerate) + `learning_plan_steps` (ordered, typed, checkable, optionally linked to a material/concept via `onDelete: "set null"`), plus an RLS policy migration mirroring `0001_rls_policies.sql`'s pattern.
+- Generation is synchronous and user-triggered (not a background job — matches `generateNextQuestion`'s pattern, not `generateRecommendation`'s): one Gemini structured call producing an ordered checklist (review material X / ask the Tutor about Y / take a quiz on Z) from the Project's goal, current mastery, and weak concepts.
+- New "Plan" tab following the existing tab convention exactly (toast on generate, optimistic checkbox updates, skeleton loading state).
+- **Exit check:** a generated plan references a known weak concept by name; a completed step survives a page refresh; regenerating archives the old plan rather than duplicating it.
+
+Should-Haves (M8–M11) before Nice-to-Haves (M12–M13), per the same Must-Have-first scope discipline this project has followed throughout.
 
 ---
 

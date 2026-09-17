@@ -12,6 +12,7 @@ import {
   type GenerateTextParams,
   type GenerateTextResult,
   type TextProvider,
+  type UnderstandDocumentBatchParams,
   type UnderstandDocumentParams,
 } from "./base";
 import { EMBEDDING_DIMENSIONS } from "../../db/schema";
@@ -218,6 +219,52 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
         relatedEntity: params.relatedEntity,
       });
       throw new AiGenerationError("Gemini document understanding failed", "gemini", err);
+    }
+  }
+
+  async understandDocumentBatch(params: UnderstandDocumentBatchParams): Promise<string> {
+    const start = Date.now();
+    try {
+      const parts = params.images.flatMap((img) => [
+        { text: `--- PAGE ${img.pageNumber} ---` },
+        { inlineData: { data: img.imageBase64, mimeType: img.mimeType } },
+      ]);
+
+      const response = await withRetry(() =>
+        this.client.models.generateContent({
+          model: TEXT_MODEL,
+          contents: [{ role: "user", parts: [{ text: params.prompt }, ...parts] }],
+        }),
+      );
+
+      const text = response.text ?? "";
+      const tokensIn = response.usageMetadata?.promptTokenCount ?? 0;
+      const tokensOut = response.usageMetadata?.candidatesTokenCount ?? 0;
+
+      await logAiUsage({
+        feature: params.feature,
+        provider: "gemini",
+        model: TEXT_MODEL,
+        latencyMs: Date.now() - start,
+        tokensIn,
+        tokensOut,
+        estimatedCostUsd: estimateCostUsd(TEXT_MODEL, tokensIn, tokensOut),
+        success: true,
+        relatedEntity: params.relatedEntity,
+      });
+
+      return text;
+    } catch (err) {
+      await logAiUsage({
+        feature: params.feature,
+        provider: "gemini",
+        model: TEXT_MODEL,
+        latencyMs: Date.now() - start,
+        success: false,
+        errorDetail: err instanceof Error ? err.message : String(err),
+        relatedEntity: params.relatedEntity,
+      });
+      throw new AiGenerationError("Gemini batch document understanding failed", "gemini", err);
     }
   }
 }
