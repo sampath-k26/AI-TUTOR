@@ -93,6 +93,27 @@ const DEMO_USERS: DemoUserSpec[] = [
     tutorQuestion: "What happens during the light-dependent reactions of photosynthesis?",
     offTopicQuestion: "Who wrote Romeo and Juliet?",
   },
+  {
+    email: "demo.learner3@aitutor.local",
+    role: "user",
+    space: { name: "Chemistry Essentials", description: "Core concepts in general chemistry." },
+    project: {
+      name: "Chemical Bonding",
+      description: "Why atoms bond the way they do.",
+      learningGoal: "Explain the difference between ionic and covalent bonds.",
+    },
+    material: {
+      filename: "chemical-bonding.pdf",
+      title: "Chemical Bonding Notes",
+      paragraphs: [
+        "An ionic bond forms when one atom transfers one or more electrons to another atom, creating oppositely charged ions that attract each other electrostatically — typically between a metal and a nonmetal, such as sodium and chlorine forming sodium chloride.",
+        "A covalent bond forms when two atoms share one or more pairs of electrons rather than transferring them outright, most commonly between two nonmetals; the shared electrons let each atom achieve a more stable, filled outer electron shell.",
+        "Electronegativity, an atom's tendency to attract shared electrons toward itself, determines which bond type forms and how polar a covalent bond is: a large electronegativity difference favors an ionic bond, a small or zero difference favors a nonpolar covalent bond, and an intermediate difference produces a polar covalent bond.",
+      ],
+    },
+    tutorQuestion: "What determines whether two atoms form an ionic bond or a covalent bond?",
+    offTopicQuestion: "What year did the Berlin Wall fall?",
+  },
 ];
 
 const QUIZ_QUESTION_COUNT = 3;
