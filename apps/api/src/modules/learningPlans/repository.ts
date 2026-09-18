@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { db } from "../../core/db";
+import { db, type Executor } from "../../core/db";
 import { learningPlans, learningPlanSteps } from "../../../db/schema";
 
 export interface NewPlanStep {
@@ -9,8 +9,8 @@ export interface NewPlanStep {
   relatedConceptId: string | null;
 }
 
-async function getStepsForPlan(planId: string) {
-  return db.select().from(learningPlanSteps).where(eq(learningPlanSteps.planId, planId)).orderBy(asc(learningPlanSteps.orderIndex));
+async function getStepsForPlan(planId: string, executor: Executor = db) {
+  return executor.select().from(learningPlanSteps).where(eq(learningPlanSteps.planId, planId)).orderBy(asc(learningPlanSteps.orderIndex));
 }
 
 export async function getActivePlanForProject(projectId: string) {
@@ -23,19 +23,23 @@ export async function getActivePlanForProject(projectId: string) {
   return { plan, steps: await getStepsForPlan(plan.id) };
 }
 
-export async function archiveActivePlans(projectId: string) {
-  await db
+export async function archiveActivePlans(projectId: string, executor: Executor = db) {
+  await executor
     .update(learningPlans)
     .set({ status: "archived" })
     .where(and(eq(learningPlans.projectId, projectId), eq(learningPlans.status, "active")));
 }
 
-export async function createPlan(projectId: string, rationale: unknown, steps: NewPlanStep[]) {
-  const [plan] = await db.insert(learningPlans).values({ projectId, rationale }).returning();
+/** Archiving the old plan and inserting the new one must happen atomically —
+ * callers that need both together (generatePlan) should run this inside
+ * `db.transaction()` and pass the tx as `executor`, so a failure between the
+ * two steps can't leave a project with no active plan at all. */
+export async function createPlan(projectId: string, rationale: unknown, steps: NewPlanStep[], executor: Executor = db) {
+  const [plan] = await executor.insert(learningPlans).values({ projectId, rationale }).returning();
   if (!plan) throw new Error("Learning plan insert returned no row");
 
   if (steps.length > 0) {
-    await db.insert(learningPlanSteps).values(
+    await executor.insert(learningPlanSteps).values(
       steps.map((step, i) => ({
         planId: plan.id,
         orderIndex: i,
@@ -47,7 +51,7 @@ export async function createPlan(projectId: string, rationale: unknown, steps: N
     );
   }
 
-  return { plan, steps: await getStepsForPlan(plan.id) };
+  return { plan, steps: await getStepsForPlan(plan.id, executor) };
 }
 
 /** Scoped by projectId via a join to learning_plans (defense layer 1 of decision D16). */

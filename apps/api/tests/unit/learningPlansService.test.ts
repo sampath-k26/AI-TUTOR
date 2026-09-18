@@ -24,6 +24,7 @@ const geminiMock = vi.hoisted(() => ({ generateStructured: vi.fn() }));
 
 const dbMocks = vi.hoisted(() => ({
   insert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
+  transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({ __tx: true })),
 }));
 
 vi.mock("../../src/modules/learningPlans/repository", () => repoMocks);
@@ -81,8 +82,30 @@ describe("generatePlan", () => {
 
     await service.generatePlan("proj-1", "user-1");
 
-    expect(repoMocks.archiveActivePlans).toHaveBeenCalledWith("proj-1");
+    expect(repoMocks.archiveActivePlans).toHaveBeenCalledWith("proj-1", { __tx: true });
     expect(repoMocks.archiveActivePlans.mock.invocationCallOrder[0]!).toBeLessThan(repoMocks.createPlan.mock.invocationCallOrder[0]!);
+  });
+
+  it("runs the archive-then-create step inside a single db.transaction, so a failure between them can't leave the project with no active plan", async () => {
+    geminiMock.generateStructured.mockResolvedValue({
+      steps: [{ type: "other", description: "Review your notes", relatedMaterialId: null, relatedConceptId: null }],
+    });
+
+    await service.generatePlan("proj-1", "user-1");
+
+    expect(dbMocks.transaction).toHaveBeenCalledOnce();
+    // Both repo calls must receive the same tx object the transaction callback was given.
+    expect(repoMocks.archiveActivePlans).toHaveBeenCalledWith("proj-1", { __tx: true });
+    expect(repoMocks.createPlan.mock.calls[0]![3]).toEqual({ __tx: true });
+  });
+
+  it("propagates an error from createPlan without archiveActivePlans's effect being treated as separately successful", async () => {
+    geminiMock.generateStructured.mockResolvedValue({
+      steps: [{ type: "other", description: "Review your notes", relatedMaterialId: null, relatedConceptId: null }],
+    });
+    repoMocks.createPlan.mockRejectedValue(new Error("insert failed"));
+
+    await expect(service.generatePlan("proj-1", "user-1")).rejects.toThrow("insert failed");
   });
 
   it("keeps a relatedConceptId/relatedMaterialId that matches a real concept/material", async () => {

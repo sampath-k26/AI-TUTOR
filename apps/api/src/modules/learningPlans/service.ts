@@ -1,4 +1,5 @@
 import { db } from "../../core/db";
+import { escapeForPromptQuote } from "../../core/promptSafety";
 import { events } from "../../../db/schema";
 import { getProjectForOwner } from "../learning/service";
 import { getGrowthOverview } from "../assessment/service";
@@ -55,8 +56,13 @@ export async function generatePlan(projectId: string, ownerId: string) {
     materialCount: readyMaterials.length,
   };
 
-  await repo.archiveActivePlans(projectId);
-  const result = await repo.createPlan(projectId, rationale, steps);
+  // Archiving the old plan and creating the new one must be atomic — otherwise
+  // a failure between the two steps (e.g. a dropped connection) can leave the
+  // project with no active plan at all instead of either the old or new one.
+  const result = await db.transaction(async (tx) => {
+    await repo.archiveActivePlans(projectId, tx);
+    return repo.createPlan(projectId, rationale, steps, tx);
+  });
 
   await db.insert(events).values({
     userId: ownerId,
@@ -85,10 +91,14 @@ function buildPlanPrompt(
 ): string {
   const conceptLines =
     growth.length > 0
-      ? growth.map((g) => `- id=${g.conceptId} "${g.conceptName}" mastery=${g.level.toFixed(0)}% trend=${g.trend}`).join("\n")
+      ? growth
+          .map((g) => `- id=${g.conceptId} "${escapeForPromptQuote(g.conceptName)}" mastery=${g.level.toFixed(0)}% trend=${g.trend}`)
+          .join("\n")
       : "(no tracked concepts yet)";
   const materialLines =
-    materials.length > 0 ? materials.map((m) => `- id=${m.id} "${m.originalFilename}"`).join("\n") : "(no processed materials yet)";
+    materials.length > 0
+      ? materials.map((m) => `- id=${m.id} "${escapeForPromptQuote(m.originalFilename)}"`).join("\n")
+      : "(no processed materials yet)";
 
   return [
     "<learner_supplied_data>",

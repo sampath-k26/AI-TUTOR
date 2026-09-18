@@ -18,3 +18,9 @@ pool.on("error", (err) => {
 export const db = drizzle(pool, { schema });
 
 export type Database = typeof db;
+
+/** The type `db.transaction(async (tx) => ...)` hands its callback — structurally
+ * compatible with `Database` for query building, but not the same nominal type
+ * (no `$client`), so a repository function that must work either standalone or
+ * inside a caller's transaction takes `Executor`, not `Database`. */
+export type Executor = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
