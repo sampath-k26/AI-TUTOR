@@ -1,3 +1,4 @@
+import { BarChart3, FileText, ListChecks, ListTodo, MessageCircle, Share2, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useOutletContext, useParams } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
@@ -10,13 +11,13 @@ export function useProjectContext() {
 }
 
 const TABS = [
-  { to: "materials", label: "Materials" },
-  { to: "tutor", label: "Tutor" },
-  { to: "quiz", label: "Quiz" },
-  { to: "growth", label: "Growth" },
-  { to: "analytics", label: "Analytics" },
-  { to: "concept-map", label: "Concept Map" },
-  { to: "plan", label: "Plan" },
+  { to: "materials", label: "Materials", icon: FileText },
+  { to: "tutor", label: "Tutor", icon: MessageCircle },
+  { to: "quiz", label: "Quiz", icon: ListChecks },
+  { to: "growth", label: "Growth", icon: TrendingUp },
+  { to: "analytics", label: "Analytics", icon: BarChart3 },
+  { to: "concept-map", label: "Concept Map", icon: Share2 },
+  { to: "plan", label: "Plan", icon: ListTodo },
 ];
 
 export function ProjectLayout() {
@@ -63,25 +64,26 @@ export function ProjectLayout() {
         <Link to={`/spaces/${project.spaceId}`} className="text-[13px] text-primary hover:underline">
           &larr; Back to Space
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground">{project.name}</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-foreground">{project.name}</h1>
         <p className="text-[13.5px] text-muted-foreground">{project.description}</p>
-        <p className="mt-1 text-[13.5px] text-foreground">
-          <span className="font-medium">Learning goal:</span> {project.learningGoal}
+        <p className="mt-2 inline-flex items-start gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-[13px] text-accent-foreground">
+          <span className="font-medium text-foreground">Learning goal:</span> {project.learningGoal}
         </p>
       </div>
 
-      <nav className="flex gap-5 border-b border-border">
+      <nav className="flex gap-1 overflow-x-auto border-b border-border">
         {TABS.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
               cn(
-                "-mb-px border-b-2 border-transparent pb-2 text-[13.5px] font-medium text-muted-foreground transition-colors",
+                "-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-2.5 pb-2.5 text-[13.5px] font-medium text-muted-foreground transition-colors hover:text-foreground",
                 isActive && "border-primary text-foreground",
               )
             }
           >
+            <tab.icon className="h-[15px] w-[15px]" />
             {tab.label}
           </NavLink>
         ))}

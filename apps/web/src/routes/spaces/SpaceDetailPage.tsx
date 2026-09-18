@@ -1,10 +1,12 @@
-import { Plus } from "lucide-react";
+import { BookOpen, Plus } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { useToast } from "../../lib/ToastContext";
 import type { Project, Space } from "../../lib/types";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { EmptyState } from "../../components/ui/empty-state";
+import { IconTile } from "../../components/ui/icon-tile";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
@@ -112,15 +114,28 @@ export function SpaceDetailPage() {
       </div>
 
       {data.projects.length === 0 ? (
-        <p className="text-[13.5px] text-muted-foreground">No Projects yet — create your first one to get started.</p>
+        <EmptyState
+          icon={BookOpen}
+          title="No Projects yet"
+          description="Create your first Project to upload material and start learning."
+          action={
+            <Button onClick={() => setSheetOpen(true)} size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Create Project
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {data.projects.map((project) => (
             <Link key={project.id} to={`/projects/${project.id}`}>
               <Card interactive className="h-full">
-                <CardHeader>
-                  <CardTitle>{project.name}</CardTitle>
-                  <CardDescription>{project.learningGoal}</CardDescription>
+                <CardHeader className="flex-row items-start gap-3 space-y-0">
+                  <IconTile icon={BookOpen} variant="success" />
+                  <div className="min-w-0 flex-1">
+                    <CardTitle>{project.name}</CardTitle>
+                    <CardDescription className="mt-1 line-clamp-2">{project.learningGoal}</CardDescription>
+                  </div>
                 </CardHeader>
               </Card>
             </Link>

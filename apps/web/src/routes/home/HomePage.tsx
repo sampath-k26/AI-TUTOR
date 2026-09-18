@@ -1,10 +1,12 @@
-import { Plus } from "lucide-react";
+import { LayoutGrid, Plus } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { useToast } from "../../lib/ToastContext";
 import type { Space } from "../../lib/types";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { EmptyState } from "../../components/ui/empty-state";
+import { IconTile } from "../../components/ui/icon-tile";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
@@ -76,15 +78,28 @@ export function HomePage() {
           <SpaceCardSkeleton />
         </div>
       ) : spaces.length === 0 ? (
-        <p className="text-[13.5px] text-muted-foreground">No Spaces yet — create your first one to get started.</p>
+        <EmptyState
+          icon={LayoutGrid}
+          title="No Spaces yet"
+          description="Create your first Space to start grouping related Projects."
+          action={
+            <Button onClick={() => setSheetOpen(true)} size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Create Space
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {spaces.map((space) => (
             <Link key={space.id} to={`/spaces/${space.id}`}>
               <Card interactive className="h-full">
-                <CardHeader>
-                  <CardTitle>{space.name}</CardTitle>
-                  <CardDescription>{space.description}</CardDescription>
+                <CardHeader className="flex-row items-start gap-3 space-y-0">
+                  <IconTile icon={LayoutGrid} />
+                  <div className="min-w-0 flex-1">
+                    <CardTitle>{space.name}</CardTitle>
+                    <CardDescription className="mt-1 line-clamp-2">{space.description}</CardDescription>
+                  </div>
                 </CardHeader>
               </Card>
             </Link>

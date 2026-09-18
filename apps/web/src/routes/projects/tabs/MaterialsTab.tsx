@@ -1,3 +1,4 @@
+import { FileText, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "../../../lib/apiClient";
 import { useToast } from "../../../lib/ToastContext";
@@ -6,6 +7,8 @@ import { useProjectContext } from "../ProjectLayout";
 import { Card, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
+import { EmptyState } from "../../../components/ui/empty-state";
+import { IconTile } from "../../../components/ui/icon-tile";
 import { Skeleton } from "../../../components/ui/skeleton";
 
 const POLL_INTERVAL_MS = 4000;
@@ -27,6 +30,7 @@ export function MaterialsTab() {
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -57,6 +61,7 @@ export function MaterialsTab() {
       const res = await apiClient.postForm<{ material: Material }>(`/projects/${project.id}/materials`, formData);
       setMaterials((prev) => [res.material, ...(prev ?? [])]);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      setSelectedFileName(null);
       toast({ variant: "success", title: "Material uploaded", description: `"${res.material.originalFilename}" is processing.` });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
@@ -69,17 +74,26 @@ export function MaterialsTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
+      <label
+        htmlFor="material-upload-input"
+        className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-surface-2/50 px-6 py-8 text-center transition-colors hover:border-border-strong hover:bg-surface-2"
+      >
+        <IconTile icon={UploadCloud} className="h-10 w-10 [&>svg]:h-5 [&>svg]:w-5" />
+        <p className="text-[13.5px] font-medium text-foreground">{selectedFileName ?? "Click to choose a PDF"}</p>
+        <p className="text-[12.5px] text-muted-foreground">PDF materials only — processed and chunked automatically</p>
         <input
+          id="material-upload-input"
           ref={fileInputRef}
           type="file"
           accept="application/pdf"
-          className="text-[13px] text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface-1 file:px-3 file:py-1.5 file:text-[13px] file:font-medium file:text-foreground"
+          className="hidden"
+          onChange={(e) => setSelectedFileName(e.target.files?.[0]?.name ?? null)}
         />
-        <Button onClick={handleUpload} disabled={uploading} size="sm">
-          {uploading ? "Uploading…" : "Upload PDF"}
-        </Button>
-      </div>
+      </label>
+      <Button onClick={handleUpload} disabled={uploading || !selectedFileName} size="sm" className="self-start gap-1.5">
+        <UploadCloud className="h-4 w-4" />
+        {uploading ? "Uploading…" : "Upload PDF"}
+      </Button>
       {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
 
       {materials === null ? (
@@ -88,16 +102,21 @@ export function MaterialsTab() {
           <MaterialCardSkeleton />
         </div>
       ) : materials.length === 0 ? (
-        <p className="text-[13.5px] text-muted-foreground">No materials yet — upload a PDF to get started.</p>
+        <EmptyState icon={FileText} title="No materials yet" description="Upload a PDF above to get started." />
       ) : (
         <div className="flex flex-col gap-2">
           {materials.map((m) => (
             <Card key={m.id}>
-              <CardContent className="flex items-center gap-2 pt-[18px] text-[13.5px]">
-                <span className="text-foreground">{m.originalFilename}</span>
+              <CardContent className="flex items-center gap-3 pt-[18px] text-[13.5px]">
+                <IconTile icon={FileText} variant="muted" />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-medium text-foreground">{m.originalFilename}</span>
+                  {m.status === "failed" && m.errorDetail && <span className="text-[12.5px] text-muted-foreground">{m.errorDetail}</span>}
+                  {m.status === "ready" && m.pageCount != null && (
+                    <span className="text-[12.5px] text-muted-foreground">{m.pageCount} pages</span>
+                  )}
+                </div>
                 <StatusBadge status={m.status} />
-                {m.status === "failed" && m.errorDetail && <span className="text-muted-foreground">({m.errorDetail})</span>}
-                {m.status === "ready" && m.pageCount != null && <span className="text-muted-foreground">· {m.pageCount} pages</span>}
               </CardContent>
             </Card>
           ))}
