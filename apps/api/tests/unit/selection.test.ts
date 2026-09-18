@@ -52,6 +52,21 @@ describe("selectNextConcept", () => {
     expect(score).toBeGreaterThanOrEqual(0);
     expect(score).toBeLessThanOrEqual(1);
   });
+
+  it("a fully-mastered concept can still resurface once stale enough, rather than scoring exactly 0 forever", () => {
+    const masteredAndStale = concept("mastered", 100, 365);
+    expect(scoreConceptForSelection(masteredAndStale, NOW)).toBeGreaterThan(0);
+
+    // still ranks far below a genuinely weak concept at similar staleness —
+    // resurfacing is a low-priority fallback, not a takeover.
+    const weakAndStale = concept("weak", 20, 365);
+    expect(selectNextConcept([masteredAndStale, weakAndStale], [], NOW)).toBe(weakAndStale);
+
+    // and a freshly-confirmed 100%-mastery concept still correctly scores 0 —
+    // only staleness should ever pull it back above 0.
+    const masteredAndFresh = concept("fresh-mastered", 100, 0);
+    expect(scoreConceptForSelection(masteredAndFresh, NOW)).toBe(0);
+  });
 });
 
 describe("selectDifficulty", () => {

@@ -7,11 +7,24 @@ import { computeConceptCooccurrence } from "./conceptMap";
 import * as repo from "./repository";
 import type { RetrievedChunk } from "./repository";
 
+/** The client-supplied filename is untrusted — a `/`/`\` in it would otherwise
+ * create extra path segments in the Storage key (e.g. escaping the intended
+ * `${projectId}/` scoping), and an unbounded length could exceed key limits.
+ * `originalFilename` (stored separately, unmodified) is still what's shown to
+ * the user; only the Storage object key needs sanitizing. */
+export function sanitizeFilenameForStorageKey(filename: string): string {
+  const noSeparators = filename.replace(/[/\\]/g, "_");
+  const noControlChars = Array.from(noSeparators)
+    .filter((ch) => ch.codePointAt(0)! > 0x1f)
+    .join("");
+  return noControlChars.slice(-200);
+}
+
 export async function uploadMaterial(projectId: string, ownerId: string, file: Express.Multer.File) {
   const project = await getProjectForOwner(projectId, ownerId);
   if (!project) return undefined;
 
-  const storagePath = `${projectId}/${randomUUID()}-${file.originalname}`;
+  const storagePath = `${projectId}/${randomUUID()}-${sanitizeFilenameForStorageKey(file.originalname)}`;
   await uploadMaterialFile(storagePath, file.buffer, file.mimetype);
 
   const material = await repo.createQueuedMaterial(projectId, storagePath, file.originalname);

@@ -56,7 +56,12 @@ export function decayTowardMidpoint(masteryOld: number, daysSinceLastEvidence: n
 
 export function updateMastery(input: MasteryUpdateInput): MasteryUpdateResult {
   const baseCorrectness = input.correctnessScore ?? (input.isCorrect ? 1 : 0);
-  const score = baseCorrectness * difficultyWeight(input.difficulty) * 100;
+  // difficultyWeight can exceed 1x (up to 1.3x at difficulty=5), so an uncapped
+  // score can exceed 100 for a merely-partial answer on a hard question (e.g.
+  // correctnessScore=0.8 * 1.3 = 104) — letting it outweigh a fully-correct
+  // answer on an easier question once blended. Clamped here so 100 always
+  // means "as strong a signal as a fully-correct answer can produce."
+  const score = clamp(baseCorrectness * difficultyWeight(input.difficulty) * 100, 0, 100);
 
   const alpha = learningRate(input.evidenceCount);
   const decayedOld = decayTowardMidpoint(input.masteryOld, input.daysSinceLastEvidence);

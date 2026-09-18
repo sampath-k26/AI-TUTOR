@@ -1,4 +1,5 @@
 import { GEMINI_TEXT_MODEL, geminiProvider } from "../../aiProvider";
+import { escapeForPromptQuote } from "../../core/promptSafety";
 import { getProjectForOwner } from "../learning/service";
 import { getFilenamesByIds } from "../materials/service";
 import * as repo from "./repository";
@@ -45,13 +46,16 @@ async function prepareTutorTurn(
   const conversation = await repo.getOrCreateConversation(projectId, conversationId);
   if (!conversation) throw new Error("Failed to create conversation");
 
-  await repo.saveMessage({ conversationId: conversation.id, role: "user", content });
-
+  // Fetched before saving this turn's own message, so it doesn't duplicate the
+  // current question against the separate "Learner question:" prompt field and
+  // doesn't shrink real prior history out of the window (found via code audit).
   const [recentMessages, relevantContext, retrievedChunks] = await Promise.all([
     repo.getRecentMessages(conversation.id),
     repo.getRelevantLearningContext(projectId),
     retrieveRelevantChunks(projectId, content),
   ]);
+
+  await repo.saveMessage({ conversationId: conversation.id, role: "user", content });
 
   // Evidence gate (cheap pre-check, decision D11): skip generation entirely when
   // retrieval alone can't support an answer — never let the model guess its way
@@ -314,7 +318,7 @@ function buildTutorPrompt(params: {
   const evidenceBlock = params.retrievedChunks
     .map(
       (c) =>
-        `[materialId=${c.materialId} page=${c.pageNumber} source="${params.materialNames.get(c.materialId) ?? "unknown"}"]\n${c.content}`,
+        `[materialId=${c.materialId} page=${c.pageNumber} source="${escapeForPromptQuote(params.materialNames.get(c.materialId) ?? "unknown")}"]\n${c.content}`,
     )
     .join("\n\n");
 

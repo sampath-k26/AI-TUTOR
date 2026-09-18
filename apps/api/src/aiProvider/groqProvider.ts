@@ -91,6 +91,13 @@ export class GroqProvider implements TextProvider {
         }),
       );
 
+      const raw: unknown = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+      // Never trust provider structured output blindly, even with strict mode requested.
+      const parsed = params.schema.parse(raw);
+
+      // Logged only after parsing succeeds — logging success first meant a
+      // subsequent schema-validation failure produced a second, contradictory
+      // failure row in ai_usage_log for the very same call.
       await logAiUsage({
         feature: params.feature,
         provider: "groq",
@@ -103,9 +110,7 @@ export class GroqProvider implements TextProvider {
         relatedEntity: params.relatedEntity,
       });
 
-      const raw: unknown = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
-      // Never trust provider structured output blindly, even with strict mode requested.
-      return params.schema.parse(raw);
+      return parsed;
     } catch (err) {
       await logAiUsage({
         feature: params.feature,

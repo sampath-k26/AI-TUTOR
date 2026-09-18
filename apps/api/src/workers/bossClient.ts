@@ -23,10 +23,21 @@ boss.on("error", (err) => {
 let started: Promise<PgBoss> | null = null;
 
 export async function ensureBossStarted(): Promise<PgBoss> {
-  started ??= boss.start().then(async (b) => {
-    await b.createQueue(QUEUE_NAMES.processMaterial);
-    await b.createQueue(QUEUE_NAMES.generateRecommendation);
-    return b;
-  });
+  started ??= boss
+    .start()
+    .then(async (b) => {
+      await b.createQueue(QUEUE_NAMES.processMaterial);
+      await b.createQueue(QUEUE_NAMES.generateRecommendation);
+      return b;
+    })
+    .catch((err) => {
+      // `??=` only re-assigns when `started` is null/undefined — a rejected
+      // promise is still a non-null value, so without this reset a single
+      // transient startup failure (e.g. Postgres briefly unreachable) would
+      // permanently break every enqueue/worker call with the same stale
+      // rejection, even after Postgres recovers. Found via code audit.
+      started = null;
+      throw err;
+    });
   return started;
 }

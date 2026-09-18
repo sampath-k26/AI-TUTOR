@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { db } from "../../core/db";
 import { concepts, growthSnapshots, mastery, questions, quizzes, recommendations, responses } from "../../../db/schema";
 import type { ConceptCandidate } from "./selection";
@@ -19,8 +19,16 @@ export async function getQuizForProject(quizId: string, projectId: string) {
   return quiz;
 }
 
-export async function completeQuiz(quizId: string) {
-  await db.update(quizzes).set({ status: "completed", completedAt: new Date() }).where(eq(quizzes.id, quizId));
+/** Returns whether this call actually transitioned the quiz — false means it was
+ * already completed (by this request's own earlier attempt, or a concurrent one),
+ * so the caller must not re-log the completion event or re-enqueue a recommendation. */
+export async function completeQuiz(quizId: string): Promise<boolean> {
+  const updated = await db
+    .update(quizzes)
+    .set({ status: "completed", completedAt: new Date() })
+    .where(and(eq(quizzes.id, quizId), ne(quizzes.status, "completed")))
+    .returning({ id: quizzes.id });
+  return updated.length > 0;
 }
 
 /** Every tracked concept for the project, left-joined to its current mastery (0 if none yet). */
@@ -50,6 +58,14 @@ export async function getRecentlyAskedConceptIds(quizId: string): Promise<string
     .orderBy(desc(questions.createdAt))
     .limit(RECENTLY_ASKED_LIMIT);
   return rows.map((r) => r.conceptId);
+}
+
+/** Total questions asked in this quiz so far — a genuine monotonic count, unlike
+ * getRecentlyAskedConceptIds's length, which is capped at RECENTLY_ASKED_LIMIT and
+ * so can't be used to alternate MCQ/open-ended past the first few questions. */
+export async function countQuestionsForQuiz(quizId: string): Promise<number> {
+  const [row] = await db.select({ count: count() }).from(questions).where(eq(questions.quizId, quizId));
+  return Number(row?.count ?? 0);
 }
 
 export async function createQuestion(params: {

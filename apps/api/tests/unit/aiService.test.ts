@@ -116,6 +116,26 @@ describe("handleTutorMessage", () => {
     expect(result?.citations).toEqual([{ materialId: "mat-1", materialName: "Machine Learning Notes", page: 14 }]);
   });
 
+  it("fetches recent message history before saving the current turn's message, so the new message isn't duplicated into that history window", async () => {
+    retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
+      { materialId: "mat-1", pageNumber: 14, content: "gradient descent minimizes loss", similarity: 0.9 },
+    ]);
+    aiProviderMocks.generateStructured.mockResolvedValue({ insufficientEvidence: false, answer: "answer", citations: [] });
+
+    const callOrder: string[] = [];
+    repoMocks.getRecentMessages.mockImplementation(async () => {
+      callOrder.push("getRecentMessages");
+      return [];
+    });
+    repoMocks.saveMessage.mockImplementation(async () => {
+      callOrder.push("saveMessage");
+    });
+
+    await handleTutorMessage("proj-1", "user-1", "What is gradient descent?", undefined);
+
+    expect(callOrder.indexOf("getRecentMessages")).toBeLessThan(callOrder.indexOf("saveMessage"));
+  });
+
   it("drops only the fabricated citations while keeping any that do match retrieved evidence", async () => {
     retrievalMocks.retrieveRelevantChunks.mockResolvedValue([
       { materialId: "mat-1", pageNumber: 14, content: "real evidence", similarity: 0.92 },

@@ -1,4 +1,5 @@
 import type PgBoss from "pg-boss";
+import { eq } from "drizzle-orm";
 import { db } from "../core/db";
 import { events } from "../../db/schema";
 import { geminiProvider } from "../aiProvider";
@@ -40,6 +41,16 @@ export async function registerGenerateRecommendationWorker(): Promise<void> {
 async function runGenerateRecommendationJob(job: PgBoss.Job<GenerateRecommendationPayload>): Promise<void> {
   const { projectId } = job.data;
 
+  // pg-boss keeps the same job.id across a redelivery of this exact invocation
+  // (a crash/restart after the Gemini call below but before the job is acked).
+  // events.dedupe_key already exists in the schema for exactly this purpose but
+  // had no write path populating it (see docs/11-KNOWN-LIMITATIONS.md) — use it
+  // here, checked before the Gemini call, so a redelivery skips the whole
+  // pipeline instead of doing a second AI call and inserting a second,
+  // independently-worded recommendation. Found via code audit.
+  const [alreadyProcessed] = await db.select({ id: events.id }).from(events).where(eq(events.dedupeKey, job.id)).limit(1);
+  if (alreadyProcessed) return;
+
   const project = await getProjectById(projectId);
   if (!project) return; // project was deleted between enqueue and processing — nothing to do
 
@@ -80,5 +91,6 @@ async function runGenerateRecommendationJob(job: PgBoss.Job<GenerateRecommendati
     projectId,
     type: "recommendation_generated",
     payload: { weakConceptIds, repeatedMistakeConceptIds },
+    dedupeKey: job.id,
   });
 }

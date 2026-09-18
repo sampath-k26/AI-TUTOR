@@ -12,6 +12,15 @@ export interface ConceptCandidate {
 
 const RECENCY_CAP_DAYS = 14;
 const REPEAT_PENALTY = 0.5;
+// A fully-mastered concept (masteryLevel=100) should still be able to resurface
+// for spaced review once it's gone stale long enough, not score exactly 0
+// forever — found via code audit: the original formula multiplied staleness by
+// a mastery weight that hits exactly 0 at masteryLevel=100, permanently
+// excluding it regardless of how stale, contradicting this module's own
+// "how weak AND how stale" design. Added as a small independent bonus (not
+// gated by mastery) rather than a floor on lowMasteryWeight, so it doesn't
+// create a plateau where 95-100% mastery all score identically.
+const STALE_REVIEW_BONUS = 0.05;
 
 export function scoreConceptForSelection(
   concept: ConceptCandidate,
@@ -25,7 +34,7 @@ export function scoreConceptForSelection(
     : Number.POSITIVE_INFINITY;
   const recencyWeight = Math.min(1, daysSinceEvidence / RECENCY_CAP_DAYS);
 
-  let score = lowMasteryWeight * (0.5 + 0.5 * recencyWeight);
+  let score = lowMasteryWeight * (0.45 + 0.45 * recencyWeight) + STALE_REVIEW_BONUS * recencyWeight;
 
   if (recentlyAskedConceptIds.includes(concept.conceptId)) {
     // Deprioritized, not excluded — a concept can still repeat if it's genuinely

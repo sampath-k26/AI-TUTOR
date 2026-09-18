@@ -8,6 +8,17 @@ export const materialsRouter = Router();
 
 materialsRouter.use(requireAuth);
 
+const GENERIC_PROCESSING_ERROR_MESSAGE = "Processing failed. Please try re-uploading the file.";
+
+/** `errorDetail` is the raw internal error message (a Gemini/Storage/Postgres
+ * error's own `.message`, possibly containing internal hostnames/paths) —
+ * kept as-is in the DB for debugging, but never returned verbatim to the
+ * owner over the API. Mirrors the `answerKey`-stripping precedent below. */
+export function sanitizeMaterialForClient<T extends { status: string; errorDetail: string | null }>(material: T): T {
+  if (material.status !== "failed" || !material.errorDetail) return material;
+  return { ...material, errorDetail: GENERIC_PROCESSING_ERROR_MESSAGE };
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_UPLOAD_BYTES },
@@ -32,7 +43,7 @@ materialsRouter.get("/projects/:projectId/materials", async (req, res) => {
     return;
   }
 
-  res.json({ materials });
+  res.json({ materials: materials.map(sanitizeMaterialForClient) });
 });
 
 materialsRouter.post("/projects/:projectId/materials", upload.single("file"), async (req, res) => {
@@ -90,5 +101,5 @@ materialsRouter.get("/materials/:materialId", async (req, res) => {
     return;
   }
 
-  res.json({ material });
+  res.json({ material: sanitizeMaterialForClient(material) });
 });

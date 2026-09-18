@@ -117,6 +117,18 @@ export async function insertConcepts(
   materialId: string,
   newConcepts: Array<{ name: string; description: string }>,
 ) {
+  // Idempotency: unlike insertChunks (delete-then-insert by materialId), this had
+  // no guard at all — a pg-boss redelivery of the same processMaterial job would
+  // re-run extraction and insert a second full set of duplicate concept rows,
+  // relying only on the extraction prompt's soft "don't propose near-duplicates"
+  // nudge. Delete only concepts *exclusively* sourced from this material (not
+  // ones later reinforced by a different material too) before re-inserting, so a
+  // redelivery of this exact material's processing is safe without disturbing
+  // concepts genuinely shared across materials. Found via code audit.
+  await db.delete(concepts).where(
+    and(eq(concepts.projectId, projectId), sql`${concepts.sourceMaterialIds} = ARRAY[${materialId}]::uuid[]`),
+  );
+
   if (newConcepts.length === 0) return;
   await db.insert(concepts).values(
     newConcepts.map(({ name, description }) => ({

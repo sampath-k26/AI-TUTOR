@@ -112,6 +112,17 @@ describe("updateMastery", () => {
     expect(high.masteryNew).toBeLessThanOrEqual(100);
   });
 
+  it("caps the per-evidence score at the maximum signal instead of letting a high-difficulty weight push a partial answer past what a fully-correct answer would produce", () => {
+    // difficultyWeight(5) = 1.3x, so an uncapped score is 0.9*1.3*100=117 for a
+    // 90%-correct answer and 130 for a fully-correct one — both above the
+    // intended 100 ceiling. Capped, they collapse to the same 100 and must
+    // therefore blend into identical mastery, not different mid-90s/low-100s values.
+    const base = { masteryOld: 50, evidenceCount: 5, daysSinceLastEvidence: 1, isCorrect: true, difficulty: 5 };
+    const mostlyCorrect = updateMastery({ ...base, correctnessScore: 0.9 });
+    const fullyCorrect = updateMastery({ ...base, correctnessScore: 1 });
+    expect(mostlyCorrect.masteryNew).toBe(fullyCorrect.masteryNew);
+  });
+
   it("supports fractional open-ended grading scores instead of only boolean correctness", () => {
     const partial = updateMastery({
       masteryOld: 50,

@@ -1,4 +1,5 @@
 import { db } from "../../core/db";
+import { escapeForPromptQuote } from "../../core/promptSafety";
 import { events } from "../../../db/schema";
 import { getProjectForOwner } from "../learning/service";
 import { getConceptById, getConceptsByIds, searchRelevantChunks } from "../materials/service";
@@ -12,6 +13,7 @@ import { mcqGenerationSchema, openEndedGenerationSchema, openEndedGradingSchema 
 const QUESTION_GROUNDING_TOP_K = 4;
 const QUESTION_GROUNDING_THRESHOLD = 0.3; // more lenient than the Tutor's D11 gate — a question can still be asked with weaker grounding
 const GROWTH_TREND_EPSILON = 3; // mastery points
+const OPEN_ENDED_CORRECT_THRESHOLD = 0.7; // accuracy (0-1) below this is not counted as a correct answer
 
 /**
  * Retrieved chunk content is uploaded-document text, i.e. attacker-reachable
@@ -37,9 +39,10 @@ export async function generateNextQuestion(quizId: string, projectId: string, ow
   const quiz = await repo.getQuizForProject(quizId, projectId);
   if (!quiz) return undefined;
 
-  const [candidates, recentlyAskedConceptIds] = await Promise.all([
+  const [candidates, recentlyAskedConceptIds, totalQuestionsAsked] = await Promise.all([
     repo.getConceptCandidates(projectId),
     repo.getRecentlyAskedConceptIds(quizId),
+    repo.countQuestionsForQuiz(quizId),
   ]);
 
   const selected = selectNextConcept(candidates, recentlyAskedConceptIds);
@@ -56,8 +59,11 @@ export async function generateNextQuestion(quizId: string, projectId: string, ow
   const groundingText = groundingChunks.map((c) => c.content).join("\n\n") || "(no closely-matching material found — write a general question about this concept)";
 
   // Alternate MCQ/open-ended so the quiz demonstrably supports both (PRD §9).
-  const askedCount = recentlyAskedConceptIds.length; // approximation is fine — this only decides variety, not grading
-  const type = askedCount % 2 === 0 ? ("mcq" as const) : ("open_ended" as const);
+  // Must be a genuine monotonic count, not recentlyAskedConceptIds.length — that's
+  // capped at RECENTLY_ASKED_LIMIT (3) for the selection algorithm's own purposes,
+  // so using it here plateaued the alternation at "open_ended" forever past the
+  // 3rd question. Found via code audit.
+  const type = totalQuestionsAsked % 2 === 0 ? ("mcq" as const) : ("open_ended" as const);
 
   if (type === "mcq") {
     const generated = await groqProvider.generateStructured({
@@ -202,7 +208,14 @@ export async function finishQuiz(quizId: string, projectId: string, ownerId: str
   const quiz = await repo.getQuizForProject(quizId, projectId);
   if (!quiz) return undefined;
 
-  await repo.completeQuiz(quizId);
+  // Idempotent: a double-click or a retried request must not re-log the
+  // completion event or re-enqueue a second recommendation job for the same
+  // quiz — found via code audit (no guard existed before this). completeQuiz's
+  // own WHERE-status guard is the authoritative check (closes the race between
+  // two near-simultaneous requests too, not just a sequential retry).
+  const didComplete = await repo.completeQuiz(quizId);
+  if (!didComplete) return { completed: true };
+
   await db.insert(events).values({ userId: ownerId, projectId, type: "assessment_completed", payload: { quizId } });
 
   // Background, not synchronous: the learner doesn't need this instantly, and it's
@@ -276,7 +289,11 @@ async function gradeOpenEnded(question: { id: string; prompt: string; answerKey:
   });
 
   return {
-    isCorrect: grading.understanding !== "weak",
+    // Derived from the actual accuracy score, not the coarser `understanding`
+    // label — `understanding !== "weak"` counted a low-accuracy "partial" answer
+    // as fully correct, hiding it from mistakePattern.ts's repeated-mistake
+    // detector (which only counts `isCorrect === false`).
+    isCorrect: grading.accuracy >= OPEN_ENDED_CORRECT_THRESHOLD,
     score: grading.accuracy,
     evaluationDetail: grading,
   };
@@ -284,7 +301,7 @@ async function gradeOpenEnded(question: { id: string; prompt: string; answerKey:
 
 function buildMcqPrompt(conceptName: string, difficulty: number, groundingText: string): string {
   return [
-    `Write one multiple-choice question (4 options, exactly one correct) testing understanding of "${conceptName}".`,
+    `Write one multiple-choice question (4 options, exactly one correct) testing understanding of "${escapeForPromptQuote(conceptName)}".`,
     `Target difficulty: ${difficulty}/5.`,
     "<project_material>",
     groundingText,
@@ -295,7 +312,7 @@ function buildMcqPrompt(conceptName: string, difficulty: number, groundingText: 
 
 function buildOpenEndedPrompt(conceptName: string, difficulty: number, groundingText: string): string {
   return [
-    `Write one open-ended question testing understanding of "${conceptName}", along with the key points a strong answer should cover.`,
+    `Write one open-ended question testing understanding of "${escapeForPromptQuote(conceptName)}", along with the key points a strong answer should cover.`,
     `Target difficulty: ${difficulty}/5.`,
     "<project_material>",
     groundingText,

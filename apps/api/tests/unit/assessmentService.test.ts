@@ -6,6 +6,7 @@ const repoMocks = vi.hoisted(() => ({
   completeQuiz: vi.fn(),
   getConceptCandidates: vi.fn(),
   getRecentlyAskedConceptIds: vi.fn(),
+  countQuestionsForQuiz: vi.fn(),
   createQuestion: vi.fn(),
   getQuestionForProject: vi.fn(),
   getResponseForQuestion: vi.fn(),
@@ -32,11 +33,16 @@ const dbMocks = vi.hoisted(() => ({
   insert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
 }));
 
+const generateRecommendationMocks = vi.hoisted(() => ({
+  enqueueGenerateRecommendation: vi.fn(),
+}));
+
 vi.mock("../../src/modules/assessment/repository", () => repoMocks);
 vi.mock("../../src/modules/learning/service", () => learningServiceMocks);
 vi.mock("../../src/modules/materials/service", () => materialsServiceMocks);
 vi.mock("../../src/aiProvider", () => ({ geminiProvider: geminiMock, groqProvider: groqMock }));
 vi.mock("../../src/core/db", () => ({ db: dbMocks }));
+vi.mock("../../src/workers/generateRecommendation", () => generateRecommendationMocks);
 
 const service = await import("../../src/modules/assessment/service");
 
@@ -72,6 +78,7 @@ describe("generateNextQuestion", () => {
   it("signals when no concepts exist yet", async () => {
     repoMocks.getConceptCandidates.mockResolvedValue([]);
     repoMocks.getRecentlyAskedConceptIds.mockResolvedValue([]);
+    repoMocks.countQuestionsForQuiz.mockResolvedValue(0);
 
     const result = await service.generateNextQuestion("quiz-1", "proj-1", "user-1");
     expect(result).toEqual({ noConceptsAvailable: true });
@@ -79,7 +86,8 @@ describe("generateNextQuestion", () => {
 
   it("generates an MCQ via Groq when an even number of questions have been asked so far", async () => {
     repoMocks.getConceptCandidates.mockResolvedValue([{ conceptId: "concept-1", masteryLevel: 20, lastEvidenceAt: null }]);
-    repoMocks.getRecentlyAskedConceptIds.mockResolvedValue([]); // length 0 -> even -> mcq
+    repoMocks.getRecentlyAskedConceptIds.mockResolvedValue([]);
+    repoMocks.countQuestionsForQuiz.mockResolvedValue(0); // 0 -> even -> mcq
     groqMock.generateStructured.mockResolvedValue({ prompt: "What is gradient descent?", options: ["A", "B", "C", "D"], correctIndex: 1 });
     repoMocks.createQuestion.mockResolvedValue({ id: "q-1", type: "mcq" });
 
@@ -92,7 +100,8 @@ describe("generateNextQuestion", () => {
 
   it("generates an open-ended question via Gemini when an odd number of questions have been asked so far", async () => {
     repoMocks.getConceptCandidates.mockResolvedValue([{ conceptId: "concept-1", masteryLevel: 20, lastEvidenceAt: null }]);
-    repoMocks.getRecentlyAskedConceptIds.mockResolvedValue(["concept-1"]); // length 1 -> odd -> open_ended
+    repoMocks.getRecentlyAskedConceptIds.mockResolvedValue(["concept-1"]);
+    repoMocks.countQuestionsForQuiz.mockResolvedValue(1); // 1 -> odd -> open_ended
     geminiMock.generateStructured.mockResolvedValue({ prompt: "Explain gradient descent.", expectedKeyPoints: ["iterative", "minimizes loss"] });
     repoMocks.createQuestion.mockResolvedValue({ id: "q-2", type: "open_ended" });
 
@@ -101,6 +110,23 @@ describe("generateNextQuestion", () => {
     expect(geminiMock.generateStructured).toHaveBeenCalledOnce();
     expect(groqMock.generateStructured).not.toHaveBeenCalled();
     expect(result).toMatchObject({ question: { id: "q-2", type: "open_ended" } });
+  });
+
+  it("keeps alternating past the 4th question instead of plateauing on open_ended forever", async () => {
+    // getRecentlyAskedConceptIds is capped at RECENTLY_ASKED_LIMIT (3) regardless
+    // of how many questions the quiz actually has — alternation must not derive
+    // from its length, or every question past the 3rd would compute the same
+    // (odd) askedCount and never generate another MCQ.
+    repoMocks.getConceptCandidates.mockResolvedValue([{ conceptId: "concept-1", masteryLevel: 20, lastEvidenceAt: null }]);
+    repoMocks.getRecentlyAskedConceptIds.mockResolvedValue(["concept-1", "concept-1", "concept-1"]); // capped at 3
+    groqMock.generateStructured.mockResolvedValue({ prompt: "Q", options: ["A", "B", "C", "D"], correctIndex: 0 });
+    repoMocks.createQuestion.mockResolvedValue({ id: "q-4", type: "mcq" });
+
+    repoMocks.countQuestionsForQuiz.mockResolvedValue(4); // the quiz's 5th question — even -> mcq
+    const result = await service.generateNextQuestion("quiz-1", "proj-1", "user-1");
+
+    expect(groqMock.generateStructured).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ question: { id: "q-4", type: "mcq" } });
   });
 });
 
@@ -147,6 +173,55 @@ describe("submitAnswer", () => {
     expect(geminiMock.generateStructured).toHaveBeenCalledOnce();
     expect(evaluation.feedbackText).toContain("missed");
     expect(evaluation.missingConcepts).toEqual(["minimizes loss"]);
+  });
+
+  it("flags a low-accuracy 'partial' open-ended answer as incorrect, not correct, so the repeated-mistake detector can see it", async () => {
+    repoMocks.getQuestionForProject.mockResolvedValue({
+      id: "q-3",
+      conceptId: "concept-1",
+      type: "open_ended",
+      difficulty: 3,
+      prompt: "Explain gradient descent.",
+      answerKey: { expectedKeyPoints: ["iterative", "minimizes loss"] },
+    });
+    repoMocks.createResponse.mockResolvedValue({ response: { id: "resp-3" }, wasAlreadyAnswered: false });
+    repoMocks.getMasteryState.mockResolvedValue(undefined);
+    geminiMock.generateStructured.mockResolvedValue({
+      understanding: "partial",
+      accuracy: 0.3,
+      keyConceptsCovered: [],
+      missingConcepts: ["iterative", "minimizes loss"],
+      feedbackText: "Mostly missed the mark.",
+    });
+
+    const result = await service.submitAnswer("q-3", "proj-1", "user-1", "It just happens.");
+
+    expect(repoMocks.createResponse).toHaveBeenCalledWith(expect.objectContaining({ isCorrect: false }));
+    expect(result?.evaluation).toMatchObject({ accuracy: 0.3 });
+  });
+
+  it("still flags a genuinely strong open-ended answer as correct", async () => {
+    repoMocks.getQuestionForProject.mockResolvedValue({
+      id: "q-4",
+      conceptId: "concept-1",
+      type: "open_ended",
+      difficulty: 3,
+      prompt: "Explain gradient descent.",
+      answerKey: { expectedKeyPoints: ["iterative", "minimizes loss"] },
+    });
+    repoMocks.createResponse.mockResolvedValue({ response: { id: "resp-4" }, wasAlreadyAnswered: false });
+    repoMocks.getMasteryState.mockResolvedValue(undefined);
+    geminiMock.generateStructured.mockResolvedValue({
+      understanding: "strong",
+      accuracy: 0.9,
+      keyConceptsCovered: ["iterative", "minimizes loss"],
+      missingConcepts: [],
+      feedbackText: "Great answer.",
+    });
+
+    await service.submitAnswer("q-4", "proj-1", "user-1", "It iteratively minimizes the loss.");
+
+    expect(repoMocks.createResponse).toHaveBeenCalledWith(expect.objectContaining({ isCorrect: true }));
   });
 
   it("classifies growth as improving when mastery rises meaningfully", async () => {
@@ -231,5 +306,33 @@ describe("submitAnswer", () => {
 
     expect(repoMocks.upsertMastery).not.toHaveBeenCalled();
     expect(result?.response).toEqual({ id: "resp-winner", questionId: "q-1", evaluation: { isCorrect: true } });
+  });
+});
+
+describe("finishQuiz", () => {
+  beforeEach(() => {
+    repoMocks.getQuizForProject.mockResolvedValue({ id: "quiz-1", projectId: "proj-1", status: "in_progress" });
+  });
+
+  it("completes the quiz, logs the event, and enqueues a recommendation", async () => {
+    repoMocks.completeQuiz.mockResolvedValue(true);
+
+    const result = await service.finishQuiz("quiz-1", "proj-1", "user-1");
+
+    expect(result).toEqual({ completed: true });
+    expect(dbMocks.insert).toHaveBeenCalled();
+    expect(generateRecommendationMocks.enqueueGenerateRecommendation).toHaveBeenCalledWith({ projectId: "proj-1" });
+  });
+
+  it("is idempotent: a retry or double-click does not re-log the event or re-enqueue a recommendation", async () => {
+    // completeQuiz's own WHERE-status guard reports false when the quiz was
+    // already completed (by this request or a concurrent one).
+    repoMocks.completeQuiz.mockResolvedValue(false);
+
+    const result = await service.finishQuiz("quiz-1", "proj-1", "user-1");
+
+    expect(result).toEqual({ completed: true });
+    expect(dbMocks.insert).not.toHaveBeenCalled();
+    expect(generateRecommendationMocks.enqueueGenerateRecommendation).not.toHaveBeenCalled();
   });
 });

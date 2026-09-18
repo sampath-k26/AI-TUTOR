@@ -180,6 +180,15 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
       const tokensIn = response.usageMetadata?.promptTokenCount ?? 0;
       const tokensOut = response.usageMetadata?.candidatesTokenCount ?? 0;
 
+      const raw: unknown = JSON.parse(response.text ?? "{}");
+      // Never trust provider structured output blindly — validate against our own schema
+      // even though we asked for it (decision D11's "never trust the model's claim blindly"
+      // applies to all structured output, not just citations).
+      const parsed = params.schema.parse(raw);
+
+      // Logged only after parsing succeeds — logging success first meant a
+      // subsequent schema-validation failure produced a second, contradictory
+      // failure row in ai_usage_log for the very same call.
       await logAiUsage({
         feature: params.feature,
         provider: "gemini",
@@ -192,11 +201,7 @@ export class GeminiProvider implements TextProvider, EmbeddingProvider, Document
         relatedEntity: params.relatedEntity,
       });
 
-      const raw: unknown = JSON.parse(response.text ?? "{}");
-      // Never trust provider structured output blindly — validate against our own schema
-      // even though we asked for it (decision D11's "never trust the model's claim blindly"
-      // applies to all structured output, not just citations).
-      return params.schema.parse(raw);
+      return parsed;
     } catch (err) {
       await logAiUsage({
         feature: params.feature,
