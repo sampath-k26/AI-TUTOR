@@ -48,6 +48,15 @@ export async function countUsers(): Promise<number> {
   return Number(row?.count ?? 0);
 }
 
+/** Unlike learning/repository.ts's getOrCreateProfile (always defaults role to
+ * "user" — a normal signup never gets to choose its own role), this inserts
+ * with the caller-specified role directly since it's only ever reached after
+ * requireAdmin has already gated the request. */
+export async function createUserProfile(userId: string, email: string, role: "user" | "admin") {
+  const [profile] = await db.insert(profiles).values({ id: userId, email, role }).returning();
+  return profile;
+}
+
 export async function listAllSpaces(limit?: number, offset = 0) {
   return db
     .select({

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { requireAdmin, requireAuth } from "../../core/auth";
+import { SupabaseAdminError } from "../../core/supabaseAdmin";
 import * as service from "./service";
-import { activityQuerySchema, paginationQuerySchema } from "./schemas";
+import { activityQuerySchema, createUserBodySchema, paginationQuerySchema } from "./schemas";
 
 export const adminRouter = Router();
 
@@ -15,6 +16,25 @@ adminRouter.get("/admin/users", async (req, res) => {
   }
   const result = await service.getUsers(query.data.limit, query.data.offset);
   res.json(result);
+});
+
+adminRouter.post("/admin/users", async (req, res) => {
+  const body = createUserBodySchema.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.flatten() });
+    return;
+  }
+
+  try {
+    const user = await service.createUser(body.data.email, body.data.password, body.data.role);
+    res.status(201).json({ user });
+  } catch (err) {
+    if (err instanceof SupabaseAdminError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
 });
 
 adminRouter.get("/admin/spaces", async (req, res) => {

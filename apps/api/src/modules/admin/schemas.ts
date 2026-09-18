@@ -11,3 +11,9 @@ export const activityQuerySchema = paginationQuerySchema.extend({
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
 });
+
+export const createUserBodySchema = z.object({
+  email: z.email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.enum(["user", "admin"]),
+});

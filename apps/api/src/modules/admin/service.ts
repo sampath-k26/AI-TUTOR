@@ -1,9 +1,15 @@
+import { createAuthUser } from "../../core/supabaseAdmin";
 import * as repo from "./repository";
 import type { ActivityFilter } from "./repository";
 
 export async function getUsers(limit?: number, offset?: number) {
   const [users, total] = await Promise.all([repo.listUsers(limit, offset ?? 0), repo.countUsers()]);
   return { users, total };
+}
+
+export async function createUser(email: string, password: string, role: "user" | "admin") {
+  const authUser = await createAuthUser(email, password);
+  return repo.createUserProfile(authUser.id, email, role);
 }
 
 export async function getSpaces(limit?: number, offset?: number) {
