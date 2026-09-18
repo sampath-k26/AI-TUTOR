@@ -26,6 +26,12 @@ export function ProjectLayout() {
 
   useEffect(() => {
     if (!projectId) return;
+    // Reset both at the start of each fetch — otherwise navigating from an
+    // invalid id straight to a valid one left `notFound` stuck true forever
+    // (found via code audit), and a stale previous project would flash while
+    // the new one loads.
+    setNotFound(false);
+    setProject(null);
     apiClient
       .get<{ project: Project }>(`/projects/${projectId}`)
       .then((res) => setProject(res.project))

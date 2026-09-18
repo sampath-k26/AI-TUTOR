@@ -66,6 +66,13 @@ export function QuizTab() {
         return;
       }
       setError(err instanceof Error ? err.message : "Failed to load the next question");
+      // If this was the very first question (from Start Quiz), there's no
+      // previous question to fall back to and no visible retry control — reset
+      // to idle so the Start Quiz button reappears, instead of leaving state
+      // stuck on "in-progress" with nothing rendered (found via code audit).
+      // A failed "Next Question" fetch doesn't hit this: the prior question/
+      // result stay on screen with Next/Finish still clickable to retry.
+      if (!question) setState("idle");
     }
   }
 

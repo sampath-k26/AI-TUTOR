@@ -37,6 +37,12 @@ export function SpaceDetailPage() {
 
   useEffect(() => {
     if (!spaceId) return;
+    // Reset both at the start of each fetch — otherwise navigating from an
+    // invalid id straight to a valid one left `notFound` stuck true forever
+    // (found via code audit), and stale previous space/projects would flash
+    // while the new one loads.
+    setNotFound(false);
+    setData(null);
     apiClient
       .get<{ space: Space; projects: Project[] }>(`/spaces/${spaceId}`)
       .then(setData)
