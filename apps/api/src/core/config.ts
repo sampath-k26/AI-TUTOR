@@ -12,6 +12,18 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
+  // Deployment-only escape hatch: some hosts (e.g. Render's free tier) don't offer
+  // a separate Background Worker service type. When true, main.ts also registers
+  // the pg-boss workers in-process instead of relying on `npm run worker` as a
+  // second process. Local dev/test keep the two processes separate (this stays
+  // false) — see src/workers/runWorker.ts for why that split exists.
+  // Not z.coerce.boolean(): that coerces via JS's `Boolean(str)`, so the literal
+  // string "false" would incorrectly coerce to `true` (any non-empty string does).
+  RUN_WORKER_IN_API_PROCESS: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+
   // Defaults to the local docker-compose Postgres so the app is runnable before
   // real Supabase credentials exist (see CLAUDE.md "Environment variables / secrets").
   DATABASE_URL: z.string().min(1).default("postgresql://ai_tutor:ai_tutor_dev_password@localhost:5432/ai_tutor_dev"),

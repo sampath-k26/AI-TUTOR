@@ -10,6 +10,8 @@ import { assessmentRouter } from "./modules/assessment/router";
 import { analyticsRouter } from "./modules/analytics/router";
 import { adminRouter } from "./modules/admin/router";
 import { learningPlansRouter } from "./modules/learningPlans/router";
+import { registerProcessMaterialWorker } from "./workers/processMaterial";
+import { registerGenerateRecommendationWorker } from "./workers/generateRecommendation";
 
 const app = express();
 
@@ -68,3 +70,12 @@ app.use(errorHandler);
 app.listen(config.PORT, () => {
   console.log(`AI-TUTOR API listening on port ${config.PORT}`);
 });
+
+// See RUN_WORKER_IN_API_PROCESS's definition in core/config.ts — only used on
+// hosts with no separate Background Worker service type. `npm run worker`
+// remains the standalone process everywhere else.
+if (config.RUN_WORKER_IN_API_PROCESS) {
+  Promise.all([registerProcessMaterialWorker(), registerGenerateRecommendationWorker()])
+    .then(() => console.log("In-process worker registered and listening for jobs."))
+    .catch((err) => console.error("In-process worker failed to start:", err));
+}
