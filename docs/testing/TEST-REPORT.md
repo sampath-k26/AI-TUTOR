@@ -203,3 +203,36 @@ None of this is expected to change the pass/fail verdicts above (the mechanisms 
 
 - Consider running the incomplete UI/injection-breadth items above once fresh Gemini quota is available.
 - Consider whether other endpoints beyond `submitAnswer` have the same class of missing-idempotency gap (recommendation generation and material processing were already fixed for a related redelivery-duplication issue per `docs/11-KNOWN-LIMITATIONS.md`; learning-plan generation and Tutor message creation were not specifically re-audited for this in this pass).
+
+---
+
+## Day-2 continuation (2026-09-18) — resumed after quota reset, but `gemini-3.6-flash` was still exhausted
+
+**Real operational finding**: the calendar day changing locally does not mean Gemini's free-tier daily quota has reset — it resets on a Pacific-Time boundary, not UTC or the local date. Confirmed live: `document_understanding` calls still returned `GenerateRequestsPerDayPerProjectPerModel-FreeTier` exhaustion at 2026-09-18 04:30 UTC, well after the local calendar day had rolled over. Worth remembering for future sessions: don't assume "it's a new day" means quota is back — check `ai_usage_log` or just try a call.
+
+Given `gemini-3.6-flash` was still blocked, this pass covered everything gemini-embedding-001 (a separate, unaffected quota), Groq, and non-AI robustness could exercise:
+
+### RAG / pgvector retrieval quality across paraphrases — ✅ pass, directly confirms the original ask
+Uploaded `cell_biology.pdf` to a fresh test project. Chunking + embedding succeeded (uses `gemini-embedding-001`, unaffected by the blocked model) even though the material's overall status ended `failed` at the later concept-extraction step — confirming `insertChunks` persists independently of that later failure, exactly as the code's ordering implies. Embedded five real queries directly and ran pgvector cosine similarity against the six stored chunks:
+
+| Query | Top match | Similarity |
+|---|---|---|
+| "What is the main function of mitochondria?" (direct) | page 3, Mitochondria | 0.7303 |
+| "What is the powerhouse of the cell?" (paraphrase, no shared keywords with the direct query) | page 3, Mitochondria | 0.7463 |
+| "How does a cell produce ATP for energy?" (paraphrase) | page 3, Mitochondria | 0.6840 |
+| "How does the plasma membrane control what enters and exits a cell?" | page 2, Cell Membrane | 0.7060 |
+| "What is Newton's second law of motion?" (off-topic) | page 3 (best available) | 0.4767 |
+
+Every on-topic paraphrase correctly retrieved the right page regardless of wording overlap, and the off-topic query's best score (0.4767) fell cleanly below the Tutor's configured evidence-gate threshold (`SIMILARITY_THRESHOLD = 0.5` in `ai/retrieval.ts`) while every on-topic query cleared it comfortably (0.68-0.75) — the threshold is well-calibrated, not just a guessed constant.
+
+### Full MCQ quiz flow (Groq) via browser — ✅ pass, confirms the UX fix in a real flow
+Ran the complete Start → question → answer → result → next/finish cycle end-to-end in the browser as `demo.learner1`. Every loading transition (start spinner, question-shaped skeleton, submitting spinner, finishing spinner) rendered correctly with no dead-UI gap, matching the earlier fix; mastery updated correctly (24%, improving) after a correct answer.
+
+### Additional security edge cases — ✅ all pass, no code changes needed
+- **JWT tampering**: a flipped signature byte, a payload swapped to an arbitrary user ID with the original signature, and a garbage/malformed token were all correctly rejected with 401 — Supabase's asymmetric signature verification (`getClaims()`) can't be forged by any of the obvious attacks.
+- **Pagination extremes**: negative offset, a limit far above the max, and non-numeric limit/offset all correctly returned 400 with a precise Zod field error — no crash, no silently-clamped-wrong behavior.
+- **Unicode/emoji/RTL/combining-diacritic ("Zalgo") text**: stored and returned intact via the API, and confirmed rendering correctly in the browser (Arabic RTL shaping, emoji, and stacked combining marks all displayed without layout breakage or corruption).
+- **No rate limiting** (re-confirmed, not a new finding): 40 rapid sequential authenticated requests all succeeded with no throttling — matches the already-documented accepted gap in `docs/11-KNOWN-LIMITATIONS.md`.
+
+### Not completed — still blocked on `gemini-3.6-flash`
+Tutor conversational UI (streaming visuals), deeper prompt-injection phrasing coverage, quiz open-ended generation/grading, recommendations, and learning-plan generation remain untested since the last pass, for the same quota reason — now confirmed to be a Pacific-Time reset rather than a simple daily one. No new code changes were made in this continuation; every mechanism touched (isolation, RLS, JWT, retrieval, pagination validation, Unicode handling, the quiz-UX fix) held up cleanly.
