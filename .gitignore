@@ -48,3 +48,6 @@ Thumbs.db
 
 # Uploaded files during local dev (never store real user files in git)
 apps/api/uploads/
+
+# Internal working docs and submission materials — kept locally only
+docs/
